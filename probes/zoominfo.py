@@ -287,19 +287,11 @@ def handle_human_verification():
 
 def handle_rate_limit():
     print("[STATUS] Rate limit detected")
-    wifi_adapter = get_wifi_adapter_name()  # returns None on Linux
-    on_windows   = wifi_adapter is not None
-
-    if on_windows:
-        randomize_mac(wifi_adapter, windows=True)
+    wifi_adapter = get_wifi_adapter_name()
+    if wifi_adapter:
         wifi_reconnect(wifi_adapter)
     else:
-        lan_adapter = get_lan_adapter_name()
-        if lan_adapter:
-            randomize_mac(lan_adapter, windows=False)
-            lan_reconnect(lan_adapter)
-        else:
-            print("[NETWORK] No active adapter detected — skipping reconnect")
+        print("[NETWORK] No WiFi adapter detected — skipping reconnect")
 
     pyautogui.hotkey("ctrl", "r")
     time.sleep(random.randint(3, 6))
