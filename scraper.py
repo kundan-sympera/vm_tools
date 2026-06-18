@@ -13,6 +13,7 @@ Shared state (DATA_DIR, _Cache, helpers) lives in shared.py.
 from dotenv import load_dotenv
 load_dotenv()  # must run before any import that reads os.environ (pyautogui, webbrowser)
 
+import os
 import webbrowser
 
 VERSION = "1.0.0"
@@ -56,7 +57,8 @@ def health():
 
 
 if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
     print("VM Scraper starting …")
-    print("→  http://0.0.0.0:8000")
-    print("→  http://0.0.0.0:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print(f"→  http://0.0.0.0:{port}")
+    print(f"→  http://0.0.0.0:{port}/docs")
+    uvicorn.run(app, host="0.0.0.0", port=port)

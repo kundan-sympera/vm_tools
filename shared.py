@@ -13,13 +13,17 @@ Exports:
 import hashlib
 import json
 import os
-import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import psycopg2
+import psycopg2.extras
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi.responses import FileResponse
+
+load_dotenv()
 
 DATA_DIR = Path("data")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -31,43 +35,41 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 class _Cache:
     """
-    SQLite-backed URL cache stored at data/scraper_cache.db.
+    PostgreSQL-backed URL cache.
 
     Each row is one key (URL or derived hash) → JSON-serialised results list.
-    Reads and writes touch only the single matching row — no full-file I/O
-    regardless of how many entries are stored.
-
     Per-URL for: general, ZocDoc listings, ZocDoc profiles, ZoomInfo.
     Per-request-hash for: Indian Stocks (params, not a single URL).
     """
-    _DB_PATH: Path = DATA_DIR / "scraper_cache.db"
-    _conn: Optional[sqlite3.Connection] = None
+    _DB_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/vm_tools_cache")
+    _conn: Optional[psycopg2.extensions.connection] = None
 
     @classmethod
-    def _connect(cls) -> sqlite3.Connection:
-        if cls._conn is None:
-            cls._conn = sqlite3.connect(str(cls._DB_PATH), check_same_thread=False)
-            cls._conn.execute("""
-                CREATE TABLE IF NOT EXISTS cache (
-                    key        TEXT PRIMARY KEY,
-                    scraped_at TEXT NOT NULL,
-                    results    TEXT NOT NULL
-                )
-            """)
+    def _connect(cls) -> psycopg2.extensions.connection:
+        if cls._conn is None or cls._conn.closed != 0:
+            cls._conn = psycopg2.connect(cls._DB_URL)
+            with cls._conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS cache (
+                        key        TEXT PRIMARY KEY,
+                        scraped_at TEXT NOT NULL,
+                        results    JSONB NOT NULL
+                    )
+                """)
             cls._conn.commit()
         return cls._conn
 
     @classmethod
     def get(cls, key: str) -> Optional[list]:
         """Return cached results for *key*, or None on a miss."""
-        row = cls._connect().execute(
-            "SELECT results FROM cache WHERE key = ?", (key,)
-        ).fetchone()
+        with cls._connect().cursor() as cur:
+            cur.execute("SELECT results FROM cache WHERE key = %s", (key,))
+            row = cur.fetchone()
         if row is None:
             return None
         try:
-            return json.loads(row[0])
-        except json.JSONDecodeError:
+            return json.loads(row[0]) if isinstance(row[0], str) else row[0]
+        except (json.JSONDecodeError, TypeError):
             return None
 
     @classmethod
@@ -75,36 +77,50 @@ class _Cache:
         """Store *results* under *key* (upsert)."""
         try:
             conn = cls._connect()
-            conn.execute(
-                "INSERT OR REPLACE INTO cache (key, scraped_at, results) VALUES (?, ?, ?)",
-                (key, datetime.now().isoformat(timespec="seconds"), json.dumps(results, ensure_ascii=False)),
-            )
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO cache (key, scraped_at, results)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (key) DO UPDATE
+                        SET scraped_at = EXCLUDED.scraped_at,
+                            results    = EXCLUDED.results
+                    """,
+                    (key, datetime.now().isoformat(timespec="seconds"), json.dumps(results, ensure_ascii=False)),
+                )
             conn.commit()
-        except sqlite3.Error as exc:
+        except psycopg2.Error as exc:
             print(f"[cache] write failed: {exc}")
 
     @classmethod
     def delete(cls, key: str) -> bool:
         """Delete one entry. Returns True if it existed."""
         conn = cls._connect()
-        cursor = conn.execute("DELETE FROM cache WHERE key = ?", (key,))
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cache WHERE key = %s", (key,))
+            deleted = cur.rowcount
         conn.commit()
-        return cursor.rowcount > 0
+        return deleted > 0
 
     @classmethod
     def clear_all(cls) -> int:
         """Delete every entry. Returns the number of rows removed."""
         conn = cls._connect()
-        cursor = conn.execute("DELETE FROM cache")
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cache")
+            deleted = cur.rowcount
         conn.commit()
-        return cursor.rowcount
+        return deleted
 
     @classmethod
     def stats(cls) -> dict:
-        """Return entry count and DB file size."""
+        """Return entry count and table size."""
         conn = cls._connect()
-        count = conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
-        size_bytes = cls._DB_PATH.stat().st_size if cls._DB_PATH.exists() else 0
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM cache")
+            count = cur.fetchone()[0]
+            cur.execute("SELECT pg_total_relation_size('cache')")
+            size_bytes = cur.fetchone()[0]
         return {"entries": count, "db_size_kb": round(size_bytes / 1024, 1)}
 
 
