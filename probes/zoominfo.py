@@ -9,10 +9,15 @@ import random
 import subprocess
 import time
 import webbrowser
-import winreg
 from datetime import datetime
 from io import StringIO
 from typing import List, Optional
+
+try:
+    import winreg
+    _WINDOWS = True
+except ImportError:
+    _WINDOWS = False
 
 import pandas as pd
 import pyautogui
@@ -146,30 +151,24 @@ def rate_limit_detected(text: str) -> bool:
 #  Connection detection
 # ─────────────────────────────────────────────
 
+def get_wifi_adapter_name() -> Optional[str]:
+    """Returns WiFi adapter name on Windows (via netsh), None on Linux."""
+    result = subprocess.run("netsh wlan show interfaces", shell=True, capture_output=True, text=True)
+    match = re.search(r"^\s*Name\s*:\s*(.+)$", result.stdout, re.MULTILINE)
+    return match.group(1).strip() if match else None
+
+
 def get_current_wifi_name() -> Optional[str]:
     result = subprocess.run("netsh wlan show interfaces", shell=True, capture_output=True, text=True)
     match = re.search(r"^\s*SSID\s*:\s*(.+)$", result.stdout, re.MULTILINE)
     return match.group(1).strip() if match else None
 
 
-def get_wifi_adapter_name() -> Optional[str]:
-    result = subprocess.run("netsh wlan show interfaces", shell=True, capture_output=True, text=True)
-    match = re.search(r"^\s*Name\s*:\s*(.+)$", result.stdout, re.MULTILINE)
-    return match.group(1).strip() if match else None
-
-
 def get_lan_adapter_name() -> Optional[str]:
-    """Return the name of the first connected Ethernet adapter."""
-    result = subprocess.run("netsh interface show interface", shell=True, capture_output=True, text=True)
-    for line in result.stdout.splitlines():
-        lower = line.lower()
-        if "connected" in lower and not any(w in lower for w in ("wi-fi", "wifi", "wireless", "wlan")):
-            match = re.search(r"Connected\s+\S+\s+(.+)$", line, re.IGNORECASE)
-            if match:
-                name = match.group(1).strip()
-                if name and "loopback" not in name.lower():
-                    return name
-    return None
+    """Returns the default network interface on Linux (via ip route)."""
+    result = subprocess.run("ip route show default", shell=True, capture_output=True, text=True)
+    match = re.search(r"dev\s+(\S+)", result.stdout)
+    return match.group(1) if match else None
 
 
 # ─────────────────────────────────────────────
@@ -177,19 +176,16 @@ def get_lan_adapter_name() -> Optional[str]:
 # ─────────────────────────────────────────────
 
 def _random_mac() -> str:
-    """Random locally-administered unicast MAC, no separators (e.g. 02A1B2C3D4E5)."""
+    """Random locally-administered unicast MAC with colons (e.g. 02:A1:B2:C3:D4:E5)."""
     mac = [random.randint(0x00, 0xFF) for _ in range(6)]
-    mac[0] = (mac[0] & 0xFE) | 0x02  # clear multicast bit, set locally-administered bit
-    return "".join(f"{b:02X}" for b in mac)
+    mac[0] = (mac[0] & 0xFE) | 0x02
+    return ":".join(f"{b:02X}" for b in mac)
 
 
-def _write_mac_registry(adapter_name: str, new_mac: str) -> bool:
-    """Write new_mac into the registry for the adapter whose friendly name matches adapter_name.
-
-    Matches by NetCfgInstanceId → Connection\\Name so it works for both WiFi and LAN.
-    """
+def _randomize_mac_windows(adapter_name: str, mac: str) -> bool:
     net_base  = r"SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}"
     conn_base = r"SYSTEM\CurrentControlSet\Control\Network\{4D36E972-E325-11CE-BFC1-08002BE10318}"
+    mac_plain = mac.replace(":", "")
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, net_base) as base:
             for i in range(winreg.QueryInfoKey(base)[0]):
@@ -210,7 +206,7 @@ def _write_mac_registry(adapter_name: str, new_mac: str) -> bool:
                                 continue
                         except (FileNotFoundError, OSError):
                             continue
-                        winreg.SetValueEx(k, "NetworkAddress", 0, winreg.REG_SZ, new_mac)
+                        winreg.SetValueEx(k, "NetworkAddress", 0, winreg.REG_SZ, mac_plain)
                         return True
                 except (PermissionError, OSError):
                     continue
@@ -219,15 +215,23 @@ def _write_mac_registry(adapter_name: str, new_mac: str) -> bool:
     return False
 
 
-def randomize_mac(adapter_name: str) -> bool:
-    """Write a random MAC to the registry for adapter_name. Returns True on success."""
-    new_mac = _random_mac()
-    if not _write_mac_registry(adapter_name, new_mac):
-        print(f"[MAC] Could not write MAC to registry for '{adapter_name}'")
-        return False
-    display = ":".join(new_mac[i:i+2] for i in range(0, 12, 2))
-    print(f"[MAC] Randomized to {display}")
-    return True
+def _randomize_mac_linux(adapter_name: str, mac: str) -> bool:
+    r = subprocess.run(f"sudo ip link set dev {adapter_name} address {mac}",
+                       shell=True, check=False)
+    return r.returncode == 0
+
+
+def randomize_mac(adapter_name: str, windows: bool) -> bool:
+    mac = _random_mac()
+    if windows:
+        ok = _randomize_mac_windows(adapter_name, mac)
+    else:
+        ok = _randomize_mac_linux(adapter_name, mac)
+    if ok:
+        print(f"[MAC] Randomized to {mac}")
+    else:
+        print(f"[MAC] Could not set MAC for '{adapter_name}'")
+    return ok
 
 
 # ─────────────────────────────────────────────
@@ -249,12 +253,11 @@ def wifi_reconnect(adapter_name: str) -> None:
 
 def lan_reconnect(adapter_name: str) -> None:
     print(f"[LAN] Reconnecting '{adapter_name}'")
-    subprocess.run(f'netsh interface set interface name="{adapter_name}" admin=DISABLED',
-                   shell=True, check=False)
+    subprocess.run(f"sudo ip link set {adapter_name} down", shell=True, check=False)
     time.sleep(3)
-    subprocess.run(f'netsh interface set interface name="{adapter_name}" admin=ENABLED',
-                   shell=True, check=False)
-    time.sleep(5)
+    subprocess.run(f"sudo ip link set {adapter_name} up", shell=True, check=False)
+    time.sleep(3)
+    subprocess.run(f"sudo dhclient {adapter_name}", shell=True, check=False)
 
 
 # ─────────────────────────────────────────────
@@ -274,19 +277,19 @@ def handle_human_verification():
 
 def handle_rate_limit():
     print("[STATUS] Rate limit detected")
-    wifi_adapter = get_wifi_adapter_name()
-    lan_adapter  = get_lan_adapter_name()
-    adapter = wifi_adapter or lan_adapter
+    wifi_adapter = get_wifi_adapter_name()  # returns None on Linux
+    on_windows   = wifi_adapter is not None
 
-    if adapter:
-        randomize_mac(adapter)
-
-    if wifi_adapter:
+    if on_windows:
+        randomize_mac(wifi_adapter, windows=True)
         wifi_reconnect(wifi_adapter)
-    elif lan_adapter:
-        lan_reconnect(lan_adapter)
     else:
-        print("[NETWORK] No active adapter detected — skipping reconnect")
+        lan_adapter = get_lan_adapter_name()
+        if lan_adapter:
+            randomize_mac(lan_adapter, windows=False)
+            lan_reconnect(lan_adapter)
+        else:
+            print("[NETWORK] No active adapter detected — skipping reconnect")
 
     pyautogui.hotkey("ctrl", "r")
     time.sleep(random.randint(3, 6))
