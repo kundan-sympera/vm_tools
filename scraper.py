@@ -57,4 +57,4 @@ if __name__ == "__main__":
     print("VM Scraper starting …")
     print("→  http://0.0.0.0:8000")
     print("→  http://0.0.0.0:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
