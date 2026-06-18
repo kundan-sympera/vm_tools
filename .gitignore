@@ -1,0 +1,40 @@
+# ── Python ───────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ── Virtual environment ───────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Environment / secrets ────────────────────
+.env
+*.env
+.env.*
+
+# ── Scraper output & cache ───────────────────
+data/
+probes/output/
+
+# ── IDE / editor ─────────────────────────────
+.vscode/
+.idea/
+*.geany
+*.swp
+*.swo
+*~
+
+# ── Jupyter ──────────────────────────────────
+*.ipynb
+.ipynb_checkpoints/
+
+# ── OS ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Claude Code ──────────────────────────────
+.claude/
