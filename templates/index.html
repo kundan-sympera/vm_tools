@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VM Scraper</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w: 200px;
+      --bg:        #0f1117;
+      --sidebar:   #161b27;
+      --panel:     #1c2232;
+      --border:    #2a3347;
+      --accent:    #4f8ef7;
+      --accent2:   #34c97e;
+      --accent3:   #f7a94f;
+      --text:      #e2e8f0;
+      --muted:     #8892a4;
+      --danger:    #e05c5c;
+      --radius:    8px;
+      --mono:      'Cascadia Code', 'Fira Mono', 'Courier New', monospace;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 0 20px;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+    }
+
+    .sidebar-logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 0 20px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo span { color: var(--muted); font-weight: 400; }
+
+    .nav { margin-top: 16px; flex: 1; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+      border-left: 3px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
+      user-select: none;
+    }
+    .nav-item:hover  { color: var(--text); background: rgba(255,255,255,.03); }
+    .nav-item.active { color: var(--text); border-left-color: var(--accent); background: rgba(79,142,247,.06); }
+    .nav-item .icon  { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-links {
+      padding: 16px 20px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar-links a {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .sidebar-links a:hover { color: var(--accent); }
+
+    /* ── Main ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 36px 40px;
+      max-width: 860px;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .page-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 7px;
+      margin-top: 20px;
+    }
+    label:first-of-type { margin-top: 0; }
+
+    textarea, input[type="text"], input[type="number"], select {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      padding: 10px 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    textarea { font-family: var(--mono); resize: vertical; }
+    textarea:focus, input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    /* ── Radio toggle (CSV / JSON) ── */
+    .fmt-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      width: fit-content;
+      margin-top: 20px;
+    }
+    .fmt-toggle label {
+      margin: 0;
+      padding: 9px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: var(--muted);
+      background: var(--panel);
+      border: none;
+      transition: background .15s, color .15s;
+      user-select: none;
+    }
+    .fmt-toggle input[type="radio"] { display: none; }
+    .fmt-toggle input[type="radio"]:checked + label {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Checkbox grid ── */
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 5px;
+      transition: background .12s;
+    }
+    .check-item:hover { background: rgba(255,255,255,.04); }
+    .check-item input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .select-all-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .link-btn {
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .link-btn:hover { text-decoration: underline; }
+
+    /* ── Submit button ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 26px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      margin-top: 24px;
+    }
+    .btn:hover  { opacity: .88; }
+    .btn:active { transform: scale(.98); }
+    .btn-blue  { background: var(--accent);  color: #fff; }
+    .btn-green { background: var(--accent2); color: #fff; }
+
+    /* ── Row mode toggle (cities vs raw URLs) ── */
+    .mode-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .mode-tab {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+      user-select: none;
+    }
+    .mode-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+
+    /* ── Inline row of inputs ── */
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+    /* ── Accent dot for section titles ── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin: 28px 0 12px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">VM Scraper <span>v2</span></div>
+  <nav class="nav">
+    <div class="nav-item active" data-page="general">
+      <span class="icon">⚙</span> General
+    </div>
+    <div class="nav-item" data-page="zoominfo">
+      <span class="icon">🔍</span> ZoomInfo
+    </div>
+    <div class="nav-item" data-page="stocks">
+      <span class="icon">📈</span> Indian Stocks
+    </div>
+    <div class="nav-item" data-page="zocdoc">
+      <span class="icon">🩺</span> ZocDoc
+    </div>
+    <div class="nav-item" data-page="zocdoc-profiles">
+      <span class="icon">📍</span> ZocDoc Profiles
+    </div>
+  </nav>
+  <div class="sidebar-links">
+    <a href="/docs" target="_blank">📄 API docs</a>
+    <a href="/health" target="_blank">❤ Health</a>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<main class="main">
+
+  <!-- ── General ── -->
+  <section class="page active" id="page-general">
+    <h2>General scraper</h2>
+    <p class="page-sub">Paste any URLs — one per line — and download the text content.</p>
+
+    <form action="/scrape" method="post">
+      <input type="hidden" name="output_format" id="gen-fmt" value="csv" />
+
+      <label for="gen-urls">URLs</label>
+      <textarea id="gen-urls" name="urls" rows="8"
+        placeholder="https://example.com/page1&#10;https://example.com/page2"></textarea>
+
+      <div class="fmt-toggle">
+        <input type="radio" name="gen_fmt_radio" id="gen-csv" value="csv" checked
+          onchange="document.getElementById('gen-fmt').value='csv'"/>
+        <label for="gen-csv">CSV</label>
+        <input type="radio" name="gen_fmt_radio" id="gen-json" value="json"
+          onchange="document.getElementById('gen-fmt').value='json'"/>
+        <label for="gen-json">JSON</label>
+      </div>
+
+      <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+    </form>
+  </section>
+
+  <!-- ── ZoomInfo ── -->
+  <section class="page" id="page-zoominfo">
+    <h2>ZoomInfo probe</h2>
+    <p class="page-sub">Build URLs from cities + industries, or paste your own list.</p>
+
+    <form action="/probe/zoominfo" method="post">
+      <input type="hidden" name="output_format" id="zi-fmt" value="csv" />
+
+      <!-- mode switcher -->
+      <div class="mode-tabs">
+        <div class="mode-tab active" data-mode="builder">URL builder</div>
+        <div class="mode-tab" data-mode="raw">Raw URL list</div>
+      </div>
+
+      <!-- builder mode -->
+      <div class="mode-panel active" id="zi-builder">
+        <label>Cities <span style="font-weight:400;text-transform:none;font-size:12px">(one per line: state, city)</span></label>
+        <textarea name="cities" rows="6"
+          placeholder="indiana, gary&#10;indiana, hammond&#10;wisconsin, kenosha"></textarea>
+
+        <p class="section-title">Industries</p>
+        <div class="select-all-row">
+          <button type="button" class="link-btn" onclick="setAll('ind',true)">Select all</button>
+          <button type="button" class="link-btn" onclick="setAll('ind',false)">Clear</button>
+        </div>
+        <div class="check-grid" id="ind-grid"></div>
+        <input type="hidden" name="industries" id="zi-industries" />
+      </div>
+
+      <!-- raw mode -->
+      <div class="mode-panel" id="zi-raw">
+        <label>URL templates <span style="font-weight:400;text-transform:none;font-size:12px">(use {page} placeholder)</span></label>
+        <textarea name="raw_urls" rows="8"
+          placeholder="https://www.zoominfo.com/companies-search/location-usa--indiana--gary-industry-manufacturing?pageNum={page}"></textarea>
+      </div>
+
+      <div class="row-2" style="margin-top:20px">
+        <div>
+          <label for="zi-max-pages">Max pages per URL</label>
+          <input type="number" id="zi-max-pages" name="max_pages" value="5" min="1" max="20" />
+        </div>
+        <div>
+          <label for="zi-min-co">Min companies to continue</label>
+          <input type="number" id="zi-min-co" name="min_companies" value="9" min="1" max="50" />
+        </div>
+      </div>
+
+      <div class="fmt-toggle">
+        <input type="radio" name="zi_fmt_radio" id="zi-csv" value="csv" checked
+          onchange="document.getElementById('zi-fmt').value='csv'"/>
+        <label for="zi-csv">CSV</label>
+        <input type="radio" name="zi_fmt_radio" id="zi-json" value="json"
+          onchange="document.getElementById('zi-fmt').value='json'"/>
+        <label for="zi-json">JSON</label>
+      </div>
+
+      <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+    </form>
+  </section>
+
+  <!-- ── Indian Stocks ── -->
+  <section class="page" id="page-stocks">
+    <h2>Indian Stocks probe</h2>
+    <p class="page-sub">Select sectors, sections, and time periods to scrape from StockEdge.</p>
+
+    <form action="/probe/stocks" method="post">
+      <input type="hidden" name="output_format" id="st-fmt" value="csv" />
+      <input type="hidden" name="sectors"  id="st-sectors"  />
+      <input type="hidden" name="sections" id="st-sections" />
+      <input type="hidden" name="periods"  id="st-periods"  />
+
+      <p class="section-title">Sectors</p>
+      <div class="select-all-row">
+        <button type="button" class="link-btn" onclick="setAll('sec',true)">Select all</button>
+        <button type="button" class="link-btn" onclick="setAll('sec',false)">Clear</button>
+      </div>
+      <div class="check-grid" id="sec-grid"></div>
+
+      <p class="section-title">Sections</p>
+      <div class="select-all-row">
+        <button type="button" class="link-btn" onclick="setAll('sct',true)">Select all</button>
+        <button type="button" class="link-btn" onclick="setAll('sct',false)">Clear</button>
+      </div>
+      <div class="check-grid" id="sct-grid"></div>
+
+      <p class="section-title">Time periods</p>
+      <div class="select-all-row">
+        <button type="button" class="link-btn" onclick="setAll('per',true)">Select all</button>
+        <button type="button" class="link-btn" onclick="setAll('per',false)">Clear</button>
+      </div>
+      <div class="check-grid" id="per-grid"></div>
+
+      <div class="fmt-toggle">
+        <input type="radio" name="st_fmt_radio" id="st-csv" value="csv" checked
+          onchange="document.getElementById('st-fmt').value='csv'"/>
+        <label for="st-csv">CSV</label>
+        <input type="radio" name="st_fmt_radio" id="st-json" value="json"
+          onchange="document.getElementById('st-fmt').value='json'"/>
+        <label for="st-json">JSON</label>
+      </div>
+
+      <button type="submit" class="btn btn-green" onclick="packStocks()">⬇ Run &amp; download</button>
+    </form>
+  </section>
+
+
+  <!-- ── ZocDoc Listings ── -->
+  <section class="page" id="page-zocdoc">
+    <h2>ZocDoc listings</h2>
+    <p class="page-sub">Scrape doctor/provider listings by city + specialty. Paginates automatically.</p>
+
+    <form action="/probe/zocdoc" method="post">
+      <input type="hidden" name="output_format" id="zd-fmt" value="csv" />
+
+      <label for="zd-url">Single URL</label>
+      <input type="text" id="zd-url" name="url"
+        placeholder="https://www.zocdoc.com/dentists/bessemer-al-244777pm" />
+
+      <label for="zd-urls">— or — Multiple URLs <span style="font-weight:400;text-transform:none;font-size:12px">(one per line)</span></label>
+      <textarea id="zd-urls" name="urls" rows="5"
+        placeholder="https://www.zocdoc.com/dentists/bessemer-al-244777pm&#10;https://www.zocdoc.com/surgeons/chicago-il-..."></textarea>
+
+      <div class="row-3" style="margin-top:20px">
+        <div>
+          <label for="zd-wait">Page load wait (s)</label>
+          <input type="number" id="zd-wait" name="page_load_wait" value="8" min="2" max="60" />
+        </div>
+        <div>
+          <label for="zd-delay">Delay between pages (s)</label>
+          <input type="number" id="zd-delay" name="delay_between_pages" value="4" min="1" max="60" step="0.5" />
+        </div>
+        <div>
+          <label for="zd-maxpages">Max pages (0 = all)</label>
+          <input type="number" id="zd-maxpages" name="max_pages" value="0" min="0" max="500" />
+        </div>
+      </div>
+
+      <div class="fmt-toggle">
+        <input type="radio" name="zd_fmt_radio" id="zd-csv" value="csv" checked
+          onchange="document.getElementById('zd-fmt').value='csv'"/>
+        <label for="zd-csv">CSV</label>
+        <input type="radio" name="zd_fmt_radio" id="zd-json" value="json"
+          onchange="document.getElementById('zd-fmt').value='json'"/>
+        <label for="zd-json">JSON</label>
+      </div>
+
+      <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+    </form>
+  </section>
+
+  <!-- ── ZocDoc Profiles ── -->
+  <section class="page" id="page-zocdoc-profiles">
+    <h2>ZocDoc profile scraper</h2>
+    <p class="page-sub">Extract office locations from individual doctor profile pages.</p>
+
+    <form action="/probe/zocdoc-profiles" method="post">
+      <input type="hidden" name="output_format" id="zdp-fmt" value="csv" />
+
+      <label for="zdp-url">Single profile URL</label>
+      <input type="text" id="zdp-url" name="url"
+        placeholder="https://www.zocdoc.com/doctor/alex-harrison-do-433823" />
+
+      <label for="zdp-urls">— or — Multiple profile URLs <span style="font-weight:400;text-transform:none;font-size:12px">(one per line)</span></label>
+      <textarea id="zdp-urls" name="urls" rows="8"
+        placeholder="https://www.zocdoc.com/doctor/alex-harrison-do-433823&#10;https://www.zocdoc.com/doctor/..."></textarea>
+
+      <div style="margin-top:20px;max-width:200px">
+        <label for="zdp-wait">Page load wait (s)</label>
+        <input type="number" id="zdp-wait" name="page_load_wait" value="8" min="2" max="60" />
+      </div>
+
+      <div class="fmt-toggle">
+        <input type="radio" name="zdp_fmt_radio" id="zdp-csv" value="csv" checked
+          onchange="document.getElementById('zdp-fmt').value='csv'"/>
+        <label for="zdp-csv">CSV</label>
+        <input type="radio" name="zdp_fmt_radio" id="zdp-json" value="json"
+          onchange="document.getElementById('zdp-fmt').value='json'"/>
+        <label for="zdp-json">JSON</label>
+      </div>
+
+      <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+    </form>
+  </section>
+
+</main>
+
+<script>
+// ── Navigation ─────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+  });
+});
+
+// ── ZoomInfo mode tabs ───────────────────────────────────────
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('zi-' + tab.dataset.mode).classList.add('active');
+  });
+});
+
+// ── Checkbox grid builder ────────────────────────────────────
+const INDUSTRIES = [
+  "manufacturing-chemicals","manufacturing","construction-management","construction",
+  "transportation-rail-and-bus","transportation","transportation-freight",
+  "manufacturing-appliances","manufacturing-electronics"
+];
+const SECTORS = sectors = [
+    "abrasives/1",
+    "alcohol/3",
+    "media-entertainment/26",
+    "logistics/25",
+    "telecom/39",
+    "textile/40",
+    "ratings/35",
+    "information-technology/24",
+    "mining/27",
+    "photographic-product/32",
+    "aviation/5",
+    "fast-moving-consumer-goods/17",
+    "healthcare/19",
+    "gas-transmission/18",
+    "diamond-jewellery/12",
+    "automobile-ancillaries/4",
+    "agriculture/2",
+    "retailing/37",
+    "diversified/13",
+    "chemicals/8",
+    "trading/41",
+    "hospitality/20",
+    "industrials-gases-fuels/21",
+    "consumer-durables/10",
+    "paper/31",
+    "plastic-products/33",
+    "banking/6",
+    "other/30",
+    "finance/16",
+    "miscellaneous/28",
+    "power/34",
+    "electricals/14",
+    "infrastructure/22",
+    "construction-materials/9",
+    "capital-goods/7",
+    "realty/36",
+    "ship-building/38",
+    "iron-steel/23",
+    "crude-oil/11",
+    "non-ferrous-metals/29",
+    "ferro-manganese/15",
+];
+const SECTIONS = ["sector-gainers","sector-losers"];
+const PERIODS  = [
+    "1D",
+    "1W",
+    "1M",
+    "3M",
+    "6M",
+    "1Y",
+    "3Y",
+    "5Y",
+];
+
+function buildGrid(containerId, items, namePrefix) {
+  const grid = document.getElementById(containerId);
+  items.forEach(item => {
+    const label = document.createElement('label');
+    label.className = 'check-item';
+    label.innerHTML = `
+      <input type="checkbox" name="${namePrefix}" value="${item}" checked />
+      <span>${item}</span>`;
+    grid.appendChild(label);
+  });
+}
+
+buildGrid('ind-grid', INDUSTRIES, 'ind');
+buildGrid('sec-grid', SECTORS,    'sec');
+buildGrid('sct-grid', SECTIONS,   'sct');
+buildGrid('per-grid', PERIODS,    'per');
+
+function setAll(prefix, checked) {
+  const grids = { ind:'ind-grid', sec:'sec-grid', sct:'sct-grid', per:'per-grid' };
+  document.querySelectorAll(`#${grids[prefix]} input[type=checkbox]`)
+    .forEach(cb => cb.checked = checked);
+}
+
+// Pack ZoomInfo industries into hidden field before submit
+document.querySelector('#page-zoominfo form').addEventListener('submit', () => {
+  const checked = [...document.querySelectorAll('#ind-grid input:checked')]
+    .map(cb => cb.value);
+  document.getElementById('zi-industries').value = checked.join(',');
+});
+
+// Pack stocks selections into hidden fields before submit
+function packStocks() {
+  const get = (prefix, gridId) =>
+    [...document.querySelectorAll(`#${gridId} input:checked`)].map(cb => cb.value).join(',');
+  document.getElementById('st-sectors').value  = get('sec','sec-grid');
+  document.getElementById('st-sections').value = get('sct','sct-grid');
+  document.getElementById('st-periods').value  = get('per','per-grid');
+}
+</script>
+</body>
+</html>

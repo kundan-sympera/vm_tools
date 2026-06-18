@@ -1,0 +1,15 @@
+we are on antix debian (this bash script will make sure everything is ready)
+set the screen size to 1920x1080
+install falkon browser
+we will first enable ssh so that we can connect
+write instruction here in detail on how to configure the vm box outside adding port forwarding
+then here run all the commands
+(we might have to copout our repo user will manuall do it)
+we will first install python 3.13.5 (our python version)
+or check if it is present
+NOTE: You must install tkinter on Linux to use MouseInfo. Run the following: sudo apt-get install python3-tk python3-dev
+
+then we will install venv
+create venv
+activate it
+install the requirements.txt
