@@ -10,16 +10,16 @@ Routes are split across routers/:
 Shared state (DATA_DIR, _Cache, helpers) lives in shared.py.
 """
 
+from dotenv import load_dotenv
+load_dotenv()  # must run before any import that reads os.environ (pyautogui, webbrowser)
+
 import webbrowser
 
 VERSION = "1.0.0"
 
 import pyautogui
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI
-
-load_dotenv()
 
 from routers import cache, general, stocks, zoominfo, zocdoc
 
