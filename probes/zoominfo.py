@@ -216,8 +216,9 @@ def _randomize_mac_windows(adapter_name: str, mac: str) -> bool:
 
 
 def _randomize_mac_linux(adapter_name: str, mac: str) -> bool:
-    r = subprocess.run(f"sudo ip link set dev {adapter_name} address {mac}",
-                       shell=True, check=False)
+    subprocess.run(f"sudo ip link set dev {adapter_name} down", shell=True, check=False)
+    r = subprocess.run(f"sudo ip link set dev {adapter_name} address {mac}", shell=True, check=False)
+    subprocess.run(f"sudo ip link set dev {adapter_name} up", shell=True, check=False)
     return r.returncode == 0
 
 
@@ -253,11 +254,20 @@ def wifi_reconnect(adapter_name: str) -> None:
 
 def lan_reconnect(adapter_name: str) -> None:
     print(f"[LAN] Reconnecting '{adapter_name}'")
-    subprocess.run(f"sudo ip link set {adapter_name} down", shell=True, check=False)
-    time.sleep(3)
-    subprocess.run(f"sudo ip link set {adapter_name} up", shell=True, check=False)
-    time.sleep(3)
-    subprocess.run(f"sudo dhclient {adapter_name}", shell=True, check=False)
+    time.sleep(2)
+    # interface is already up after MAC randomization — just renew DHCP lease
+    for client, cmd in [
+        ("nmcli",    f"nmcli dev reapply {adapter_name}"),
+        ("dhcpcd",   f"sudo dhcpcd {adapter_name}"),
+        ("udhcpc",   f"sudo udhcpc -i {adapter_name}"),
+        ("dhclient", f"sudo dhclient {adapter_name}"),
+    ]:
+        if subprocess.run(f"which {client}", shell=True, capture_output=True).returncode == 0:
+            print(f"[LAN] Using {client} for DHCP")
+            subprocess.run(cmd, shell=True, check=False)
+            break
+    else:
+        print("[LAN] No DHCP client found — interface is up, OS may handle renewal automatically")
 
 
 # ─────────────────────────────────────────────
