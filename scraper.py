@@ -12,6 +12,8 @@ Shared state (DATA_DIR, _Cache, helpers) lives in shared.py.
 
 import webbrowser
 
+VERSION = "1.0.0"
+
 import pyautogui
 import uvicorn
 from dotenv import load_dotenv
@@ -50,7 +52,7 @@ app.include_router(cache.router)
 
 @app.get("/health")
 def health():
-    return {"status": "running", "message": "VM Scraper is ready"}
+    return {"status": "running", "message": "VM Scraper is ready", "version": VERSION}
 
 
 if __name__ == "__main__":
