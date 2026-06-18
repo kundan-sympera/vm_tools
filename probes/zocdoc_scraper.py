@@ -18,7 +18,7 @@ Results are written incrementally (one file per source URL) to scraper/output/.
 USAGE
 -----
     # Single URL:
-    python zocdoc_scraper.py --url "https://www.zocdoc.com/dentists/bessemer-al-244777pm"
+    python zocdoc_scraper.py --url "https://www.zocdoc.com/dentists/arrowhead-ranch-glendale-az-220726pm"
 
     # Batch from file (output of zocdoc_url_extractor.py):
     python zocdoc_scraper.py --urls-file zocdoc_examples/surgeons_urls.txt
@@ -76,57 +76,80 @@ JS_GET_TOTAL = r"""
     var clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
     let total = 0;
-
     const selectors = [
-        'h1',
+        'h1',                                   // Main heading often contains it
         '[class*="SearchResultCount"]',
         '[class*="result-count"]',
         '[class*="ResultCount"]',
         '[class*="resultsCount"]',
-        '[data-qa*="count"]'
+        '[data-qa*="count"]',
+        '[class*="count"]',                     // Broader fallback
+        'header h1',                            // More specific
+        '.search-header h1',                    // Zocdoc-specific patterns
+        'h1[data-testid]'                       // Common React test IDs
     ];
 
+    // Priority: Look for "X verified" pattern first
     for (let sel of selectors) {
         const els = document.querySelectorAll(sel);
         for (let el of els) {
-            const text = clean(el.innerText);
-
-            // Strong preference for "X verified" pattern
+            const text = clean(el.innerText || el.textContent);
+            
+            // Strong match for verified dentists pattern (handles "315 verified Dentists...")
             let match = text.match(/(\d[\d,]*)\s+verified/i);
             if (match) {
                 total = parseInt(match[1].replace(/,/g, ''), 10);
-                console.log('zocdoc-total: verified match', total, 'from:', text);
+                console.log('✅ zocdoc-total: Verified match found', total, 'from:', text);
                 break;
             }
-
-            // Fallback to any number in the element
-            match = text.match(/(\d[\d,]*)/);
+            
+            // Fallback: any large number that looks like a count (avoid "100+")
+            match = text.match(/(\d{3,}[\d,]*)/);  // Prefer 3+ digit numbers
             if (match) {
-                total = parseInt(match[1].replace(/,/g, ''), 10);
+                const candidate = parseInt(match[1].replace(/,/g, ''), 10);
+                if (candidate > 100 && candidate !== 100) {  // Skip the "100+" teaser
+                    total = candidate;
+                }
             }
         }
         if (total > 0) break;
     }
 
-    // Whole-page fallback for "verified" pattern
-    if (total === 0 || total < 30) {
+    // Whole-page fallback (very reliable for Zocdoc)
+    if (total === 0 || total < 200) {
         const bodyText = clean(document.body.innerText);
-        const verifiedMatch = bodyText.match(/(\d[\d,]*)\s+verified/i);
+        const verifiedMatch = bodyText.match(/(\d[\d,]*)\s+verified\s+(dentists|doctors|providers)/i);
         if (verifiedMatch) {
             total = parseInt(verifiedMatch[1].replace(/,/g, ''), 10);
-            console.log('zocdoc-total: body fallback', total);
+            console.log('✅ zocdoc-total: Body fallback verified match', total);
+        } else {
+            // Ultra fallback - look anywhere for the location + verified pattern
+            const locationMatch = bodyText.match(/(\d[\d,]*)\s+verified\s+Dentists?\s+in\s+Arrowhead/i);
+            if (locationMatch) {
+                total = parseInt(locationMatch[1].replace(/,/g, ''), 10);
+                console.log('✅ zocdoc-total: Location-specific match', total);
+            }
         }
     }
 
-    const ta = document.createElement('textarea');
-    ta.value = total.toString();
-    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    try { document.execCommand('copy'); console.log('zocdoc-total: copied', total); }
-    catch(e) { console.log('zocdoc-total: copy failed'); }
-    document.body.removeChild(ta);
+    // Copy to clipboard
+    if (total > 0) {
+        const ta = document.createElement('textarea');
+        ta.value = total.toString();
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+            console.log('✅ zocdoc-total: Copied successfully →', total);
+        } catch(e) {
+            console.log('❌ zocdoc-total: Copy failed');
+        }
+        document.body.removeChild(ta);
+    } else {
+        console.log('❌ zocdoc-total: No count found');
+    }
 })();
 """
 
@@ -236,6 +259,12 @@ def _close_devtools(log: Callable) -> None:
     time.sleep(0.5)
 
 
+def _close_tab(log: Callable) -> None:
+    log("[browser] closing tab (Ctrl+W)...")
+    pyautogui.hotkey("ctrl", "w")
+    time.sleep(0.5)
+
+
 def _run_js(js: str, log: Callable) -> str:
     """Paste js into the DevTools console and return whatever ends up on the clipboard."""
     pyperclip.copy(js)
@@ -296,6 +325,7 @@ def scrape_url(
         if _is_blocked(page_text):
             log("[warn] block/captcha detected — waiting 30s then retrying once")
             _close_devtools(log)
+            _close_tab(log)
             time.sleep(30)
             webbrowser.open(page_url)
             time.sleep(page_load_wait + 5)
@@ -304,6 +334,7 @@ def scrape_url(
             if _is_blocked(page_text):
                 log("[error] still blocked — skipping this URL")
                 _close_devtools(log)
+                _close_tab(log)
                 break
 
         # Get total provider count once from page 1
@@ -318,6 +349,7 @@ def scrape_url(
         # Extract providers
         raw = _run_js(JS_EXTRACT, log)
         _close_devtools(log)
+        _close_tab(log)
 
         try:
             data = json.loads(raw)
@@ -356,10 +388,6 @@ def scrape_url(
             batch = random.randint(30, 60)
             log(f"[batch pause] {batch}s...")
             time.sleep(batch)
-
-    log("[browser] closing tab (Ctrl+W)...")
-    pyautogui.hotkey("ctrl", "w")
-    time.sleep(0.5)
 
     return all_providers
 
@@ -451,15 +479,18 @@ def run(
     try:
         for idx, u in enumerate(urls, 1):
             log(f"\n[{idx}/{len(urls)}] {u}")
-            rows = scrape_url(
-                url=u,
-                page_load_wait=page_load_wait,
-                delay_between_pages=delay_between_pages,
-                max_pages=max_pages,
-                log=log,
-            )
-            log(f"[{idx}/{len(urls)}] {len(rows)} providers collected")
-            all_rows.extend(rows)
+            try:
+                rows = scrape_url(
+                    url=u,
+                    page_load_wait=page_load_wait,
+                    delay_between_pages=delay_between_pages,
+                    max_pages=max_pages,
+                    log=log,
+                )
+                log(f"[{idx}/{len(urls)}] {len(rows)} providers collected")
+                all_rows.extend(rows)
+            except Exception as exc:
+                log(f"[{idx}/{len(urls)}] ERROR scraping {u} — {exc} — skipping")
 
             if idx < len(urls):
                 pause = random.randint(5, 15)

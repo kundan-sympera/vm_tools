@@ -225,49 +225,51 @@ def scrape(
 
     for t, url_template in enumerate(urls, 1):
         log(f"[{t}/{len(urls)}] {url_template}")
+        try:
+            for page in range(1, max_pages + 1):
+                url = url_template.format(page=page)
+                pages_fetched += 1
 
-        for page in range(1, max_pages + 1):
-            url = url_template.format(page=page)
-            pages_fetched += 1
+                webbrowser.open(url)
+                time.sleep(random.randint(5, 9))
 
-            webbrowser.open(url)
-            time.sleep(random.randint(5, 9))
+                page_text = copy_page_text()
 
-            page_text = copy_page_text()
+                if human_verification_detected(page_text):
+                    handle_human_verification()
+                if rate_limit_detected(page_text):
+                    handle_rate_limit()
 
-            if human_verification_detected(page_text):
-                handle_human_verification()
-            if rate_limit_detected(page_text):
-                handle_rate_limit()
+                csv_text = extract_csv()
+                pyautogui.hotkey("ctrl", "w")
 
-            csv_text = extract_csv()
-            pyautogui.hotkey("ctrl", "w")
+                # parse
+                rows_this_page = None
+                try:
+                    df = pd.read_csv(StringIO(csv_text.strip()))
+                    if "company_name" in df.columns:
+                        file_exists = os.path.exists(output_file)
+                        if output_columns is None:
+                            output_columns = list(df.columns)
+                        else:
+                            df = df.reindex(columns=output_columns)
+                        df.to_csv(output_file, mode="a", header=not file_exists, index=False)
+                        rows_this_page = len(df)
+                        total_rows += rows_this_page
+                        log(f"  page {page}: {rows_this_page} rows (total {total_rows})")
+                except Exception as e:
+                    log(f"  page {page}: parse error — {e}")
 
-            # parse
-            rows_this_page = None
-            try:
-                df = pd.read_csv(StringIO(csv_text.strip()))
-                if "company_name" in df.columns:
-                    file_exists = os.path.exists(output_file)
-                    if output_columns is None:
-                        output_columns = list(df.columns)
-                    else:
-                        df = df.reindex(columns=output_columns)
-                    df.to_csv(output_file, mode="a", header=not file_exists, index=False)
-                    rows_this_page = len(df)
-                    total_rows += rows_this_page
-                    log(f"  page {page}: {rows_this_page} rows (total {total_rows})")
-            except Exception as e:
-                log(f"  page {page}: parse error — {e}")
+                # batch pause every 9 pages
+                if pages_fetched % 9 == 0:
+                    wait = random.randint(60, 120)
+                    log(f"  batch pause {wait}s …")
+                    time.sleep(wait)
 
-            # batch pause every 9 pages
-            if pages_fetched % 9 == 0:
-                wait = random.randint(60, 120)
-                log(f"  batch pause {wait}s …")
-                time.sleep(wait)
-
-            if rows_this_page is None or rows_this_page < min_companies:
-                break
+                if rows_this_page is None or rows_this_page < min_companies:
+                    break
+        except Exception as exc:
+            log(f"[{t}/{len(urls)}] ERROR — {exc} — skipping URL template")
 
     log(f"[DONE] Total rows: {total_rows} → {output_file}")
     return total_rows

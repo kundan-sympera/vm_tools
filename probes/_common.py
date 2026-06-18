@@ -17,7 +17,6 @@ import pyautogui
 
 def open_console() -> None:
     pyautogui.press("f12")
-    time.sleep(2)
 
 
 def close_console() -> None:

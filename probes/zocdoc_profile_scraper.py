@@ -342,9 +342,12 @@ def run(
     try:
         for idx, u in enumerate(urls, 1):
             log(f"\n[{idx}/{len(urls)}] {u}")
-            rows = scrape_profile(url=u, page_load_wait=page_load_wait, log=log)
-            log(f"[{idx}/{len(urls)}] {len(rows)} location(s) collected")
-            all_rows.extend(rows)
+            try:
+                rows = scrape_profile(url=u, page_load_wait=page_load_wait, log=log)
+                log(f"[{idx}/{len(urls)}] {len(rows)} location(s) collected")
+                all_rows.extend(rows)
+            except Exception as exc:
+                log(f"[{idx}/{len(urls)}] ERROR scraping {u} — {exc} — skipping")
 
             if idx < len(urls):
                 pause = random.randint(5, 15)
