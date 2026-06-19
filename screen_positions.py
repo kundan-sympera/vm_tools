@@ -38,3 +38,8 @@ DEFAULT_MOUSE_MOVE_DURATION = 0.3
 DEFAULT_TYPE_DURATION = 0.05
 DEFAULT_ORGANIZATION = "First"
 DEFAULT_BRANCH = "Sioux Falls - Sioux Falls, South Dakota"
+
+GROK_COPY_3R_1080p = position(x=710, y=767)
+GROK_COPY_2R_1080p = position(x=709, y=810)
+GROK_INPUT_1080p = position(x=806, y=988)
+GROK_BASE_INPUT_1080p = position(x=894, y=505)

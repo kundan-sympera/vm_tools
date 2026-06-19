@@ -1,7 +1,7 @@
 """
 services/company_extractor.py — Extract structured company data from a CSV using DeepSeek.
 
-Input CSV columns : id, company_name, company_address, details, status
+Input CSV columns : pool_id, pool_id_link, validated_name, validated_address, details, status
 Output CSV columns: pool_id_link, field, value  (one row per field, name_check=True only)
 
 DB table          : company_information (one row per company)
@@ -22,6 +22,7 @@ _FIELDS = ["website", "founded_year", "revenue", "ownership", "employees"]
 _CREATE_TABLE = """
     CREATE TABLE IF NOT EXISTS company_information (
         id           SERIAL PRIMARY KEY,
+        pool_id      TEXT,
         pool_id_link TEXT NOT NULL,
         name_check   BOOLEAN,
         website      TEXT,
@@ -48,14 +49,15 @@ def _ensure_table(conn):
     conn.commit()
 
 
-def _upsert_company(conn, pool_id_link: str, extracted: dict, details: str):
+def _upsert_company(conn, pool_id: str, pool_id_link: str, extracted: dict, details: str):
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO company_information
-                (pool_id_link, name_check, website, founded_year, revenue, ownership, employees, details, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (pool_id, pool_id_link, name_check, website, founded_year, revenue, ownership, employees, details, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT DO NOTHING
         """, (
+            str(pool_id),
             str(pool_id_link),
             extracted.get("name_check", False),
             extracted.get("website", ""),
@@ -75,13 +77,12 @@ def run(csv_bytes: bytes) -> bytes:
     Returns output CSV bytes in pool_id_link, field, value format.
     """
     df = pd.read_csv(io.BytesIO(csv_bytes))
+    df.columns = df.columns.str.lower()
 
-    required = {"id", "company_name", "company_address", "details"}
-    missing  = required - set(df.columns.str.lower())
+    required = {"pool_id", "pool_id_link", "validated_name", "validated_address", "details"}
+    missing  = required - set(df.columns)
     if missing:
         raise ValueError(f"Input CSV missing columns: {missing}")
-
-    df.columns = df.columns.str.lower()
 
     conn = _get_conn()
     _ensure_table(conn)
@@ -89,12 +90,13 @@ def run(csv_bytes: bytes) -> bytes:
     output_rows = []
 
     for _, row in df.iterrows():
-        pool_id     = str(row["id"])
-        name        = str(row.get("company_name", ""))
-        address     = str(row.get("company_address", ""))
-        details     = str(row.get("details", ""))
+        pool_id      = str(row["pool_id"])
+        pool_id_link = str(row["pool_id_link"])
+        name         = str(row.get("validated_name", ""))
+        address      = str(row.get("validated_address", ""))
+        details      = str(row.get("details", ""))
 
-        print(f"[company_extractor] Processing id={pool_id} — {name}")
+        print(f"[company_extractor] Processing pool_id={pool_id} — {name}")
 
         user_prompt = build_user_prompt(name, address, details)
         raw         = get_deepseek_response(SYSTEM_PROMPT, user_prompt)
@@ -103,13 +105,13 @@ def run(csv_bytes: bytes) -> bytes:
         if not isinstance(extracted, dict):
             extracted = {}
 
-        _upsert_company(conn, pool_id, extracted, details)
+        _upsert_company(conn, pool_id, pool_id_link, extracted, details)
 
         if extracted.get("name_check") is True:
             for field in _FIELDS:
                 value = extracted.get(field, "")
                 if value:
-                    output_rows.append({"pool_id_link": pool_id, "field": field, "value": value})
+                    output_rows.append({"pool_id_link": pool_id_link, "field": field, "value": value})
 
     conn.close()
 

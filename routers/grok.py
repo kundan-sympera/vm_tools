@@ -2,7 +2,7 @@
 routers/grok.py — Grok company enrichment probe
 
 Routes:
-  POST /probe/grok  → upload CSV (id, company_name, company_address), returns enriched CSV
+  POST /probe/grok  → upload CSV (id, validated_name, validated_address), returns enriched CSV
 """
 
 import io
@@ -30,12 +30,12 @@ async def probe_grok(
     except Exception as exc:
         return JSONResponse(status_code=400, content={"error": f"Could not read CSV: {exc}"})
 
-    required_cols = {"id", "company_name", "company_address"}
+    required_cols = {"pool_id", "pool_id_link", "validated_name", "validated_address"}
     missing = required_cols - set(df.columns)
     if missing:
         return JSONResponse(status_code=400, content={"error": f"CSV missing columns: {', '.join(sorted(missing))}"})
 
-    companies = df[["id", "company_name", "company_address"]].to_dict(orient="records")
+    companies = df[["pool_id", "pool_id_link", "validated_name", "validated_address"]].to_dict(orient="records")
     if not companies:
         return JSONResponse(status_code=400, content={"error": "CSV has no data rows"})
 

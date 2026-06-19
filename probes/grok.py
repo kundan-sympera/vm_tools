@@ -7,8 +7,8 @@ Public API
 ----------
 scrape(companies: list[dict], system_prompt: str | None) -> list[dict]
 
-Each input dict must have:  id, company_name, company_address
-Each output dict has:       id, company_name, company_address, details, status
+Each input dict must have:  pool_id, pool_id_link, validated_name, validated_address
+Each output dict has:       pool_id, pool_id_link, validated_name, validated_address, details, status
 """
 
 import time
@@ -231,12 +231,12 @@ def scrape(
 
 	Parameters
 	----------
-	companies : list of dicts with keys  id, company_name, company_address
+	companies : list of dicts with keys  pool_id, pool_id_link, validated_name, validated_address
 	system_prompt : override the default prompt (optional)
 
 	Returns
 	-------
-	list of dicts:  id, company_name, company_address, details, status
+	list of dicts:  pool_id, pool_id_link, validated_name, validated_address, details, status
 	"""
 	if not companies:
 		return []
@@ -249,14 +249,15 @@ def scrape(
 
 	total = len(companies)
 	for i, row in enumerate(companies, 1):
-		company_id      = row.get("id", i)
-		company_name    = str(row.get("company_name", "")).strip()
-		company_address = str(row.get("company_address", "")).strip()
+		pool_id           = row.get("pool_id", i)
+		pool_id_link      = row.get("pool_id_link", "")
+		validated_name    = str(row.get("validated_name", "")).strip()
+		validated_address = str(row.get("validated_address", "")).strip()
 
-		print(f"[grok {i}/{total}] {company_name} | {company_address}")
+		print(f"[grok {i}/{total}] {validated_name} | {validated_address}")
 
 		try:
-			details = _query_company(company_name, company_address)
+			details = _query_company(validated_name, validated_address)
 			status  = "success" if len(details) > 50 else "partial"
 		except Exception as exc:
 			details = f"ERROR: {exc}"
@@ -264,11 +265,12 @@ def scrape(
 
 		results.append(
 			{
-				"id":              company_id,
-				"company_name":    company_name,
-				"company_address": company_address,
-				"details":         details,
-				"status":          status,
+				"pool_id":           pool_id,
+				"pool_id_link":      pool_id_link,
+				"validated_name":    validated_name,
+				"validated_address": validated_address,
+				"details":           details,
+				"status":            status,
 			}
 		)
 
@@ -278,4 +280,4 @@ def scrape(
 	# Close the Grok tab when done
 	pyautogui.hotkey("ctrl", "w")
 	print(f"[grok] Done — {total} companies processed.")
-	return results 
+	return results

@@ -75,11 +75,11 @@ Output:
 """
 
 
-def build_user_prompt(company_name: str, company_address: str, details: str) -> str:
+def build_user_prompt(validated_name: str, validated_address: str, details: str) -> str:
     return f"""Extract company information from the details below.
 
-Company Name: {company_name}
-Company Address: {company_address}
+Company Name: {validated_name}
+Company Address: {validated_address}
 
 Details:
 {details}
