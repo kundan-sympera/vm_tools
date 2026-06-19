@@ -1,0 +1,42 @@
+<section class="page" id="page-zocdoc">
+  <h2>ZocDoc listings</h2>
+  <p class="page-sub">Scrape doctor/provider listings by city + specialty. Paginates automatically.</p>
+
+  <form action="/probe/zocdoc" method="post">
+    <input type="hidden" name="output_format" id="zd-fmt" value="csv" />
+
+    <label for="zd-url">Single URL</label>
+    <input type="text" id="zd-url" name="url"
+      placeholder="https://www.zocdoc.com/dentists/bessemer-al-244777pm" />
+
+    <label for="zd-urls">— or — Multiple URLs <span style="font-weight:400;text-transform:none;font-size:12px">(one per line)</span></label>
+    <textarea id="zd-urls" name="urls" rows="5"
+      placeholder="https://www.zocdoc.com/dentists/bessemer-al-244777pm&#10;https://www.zocdoc.com/surgeons/chicago-il-..."></textarea>
+
+    <div class="row-3" style="margin-top:20px">
+      <div>
+        <label for="zd-wait">Page load wait (s)</label>
+        <input type="number" id="zd-wait" name="page_load_wait" value="8" min="2" max="60" />
+      </div>
+      <div>
+        <label for="zd-delay">Delay between pages (s)</label>
+        <input type="number" id="zd-delay" name="delay_between_pages" value="4" min="1" max="60" step="0.5" />
+      </div>
+      <div>
+        <label for="zd-maxpages">Max pages (0 = all)</label>
+        <input type="number" id="zd-maxpages" name="max_pages" value="0" min="0" max="500" />
+      </div>
+    </div>
+
+    <div class="fmt-toggle">
+      <input type="radio" name="zd_fmt_radio" id="zd-csv" value="csv" checked
+        onchange="document.getElementById('zd-fmt').value='csv'"/>
+      <label for="zd-csv">CSV</label>
+      <input type="radio" name="zd_fmt_radio" id="zd-json" value="json"
+        onchange="document.getElementById('zd-fmt').value='json'"/>
+      <label for="zd-json">JSON</label>
+    </div>
+
+    <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+  </form>
+</section>

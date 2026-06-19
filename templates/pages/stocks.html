@@ -1,0 +1,43 @@
+<section class="page" id="page-stocks">
+  <h2>Indian Stocks probe</h2>
+  <p class="page-sub">Select sectors, sections, and time periods to scrape from StockEdge.</p>
+
+  <form action="/probe/stocks" method="post">
+    <input type="hidden" name="output_format" id="st-fmt" value="csv" />
+    <input type="hidden" name="sectors"  id="st-sectors"  />
+    <input type="hidden" name="sections" id="st-sections" />
+    <input type="hidden" name="periods"  id="st-periods"  />
+
+    <p class="section-title">Sectors</p>
+    <div class="select-all-row">
+      <button type="button" class="link-btn" onclick="setAll('sec',true)">Select all</button>
+      <button type="button" class="link-btn" onclick="setAll('sec',false)">Clear</button>
+    </div>
+    <div class="check-grid" id="sec-grid"></div>
+
+    <p class="section-title">Sections</p>
+    <div class="select-all-row">
+      <button type="button" class="link-btn" onclick="setAll('sct',true)">Select all</button>
+      <button type="button" class="link-btn" onclick="setAll('sct',false)">Clear</button>
+    </div>
+    <div class="check-grid" id="sct-grid"></div>
+
+    <p class="section-title">Time periods</p>
+    <div class="select-all-row">
+      <button type="button" class="link-btn" onclick="setAll('per',true)">Select all</button>
+      <button type="button" class="link-btn" onclick="setAll('per',false)">Clear</button>
+    </div>
+    <div class="check-grid" id="per-grid"></div>
+
+    <div class="fmt-toggle">
+      <input type="radio" name="st_fmt_radio" id="st-csv" value="csv" checked
+        onchange="document.getElementById('st-fmt').value='csv'"/>
+      <label for="st-csv">CSV</label>
+      <input type="radio" name="st_fmt_radio" id="st-json" value="json"
+        onchange="document.getElementById('st-fmt').value='json'"/>
+      <label for="st-json">JSON</label>
+    </div>
+
+    <button type="submit" class="btn btn-green" onclick="packStocks()">⬇ Run &amp; download</button>
+  </form>
+</section>

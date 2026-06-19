@@ -1,0 +1,27 @@
+<section class="page" id="page-grok">
+  <h2>Grok enrichment</h2>
+  <p class="page-sub">Upload a CSV of companies — Grok researches each one and returns enriched details.</p>
+
+  <form id="grok-form">
+    <label for="grok-file">Input CSV</label>
+    <input type="file" id="grok-file" accept=".csv" class="file-input" />
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">
+      Required columns: <code>id, company_name, company_address</code>
+    </p>
+
+    <label for="grok-prompt">System prompt <span style="font-weight:400;text-transform:none;font-size:12px">(leave blank for default)</span></label>
+    <textarea id="grok-prompt" name="system_prompt" rows="6" placeholder="Leave blank to use the built-in research prompt…"></textarea>
+
+    <div class="fmt-toggle">
+      <input type="radio" name="grok_fmt_radio" id="grok-csv" value="csv" checked
+        onchange="grokFmt='csv'"/>
+      <label for="grok-csv">CSV</label>
+      <input type="radio" name="grok_fmt_radio" id="grok-json" value="json"
+        onchange="grokFmt='json'"/>
+      <label for="grok-json">JSON</label>
+    </div>
+
+    <button type="submit" class="btn btn-blue" id="grok-btn">⬇ Run &amp; download</button>
+    <span id="grok-status" style="margin-left:14px;font-size:13px;color:var(--muted);display:none">Processing…</span>
+  </form>
+</section>

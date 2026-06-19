@@ -1,0 +1,55 @@
+<section class="page" id="page-zoominfo">
+  <h2>ZoomInfo probe</h2>
+  <p class="page-sub">Build URLs from cities + industries, or paste your own list.</p>
+
+  <form action="/probe/zoominfo" method="post">
+    <input type="hidden" name="output_format" id="zi-fmt" value="csv" />
+
+    <div class="mode-tabs">
+      <div class="mode-tab active" data-mode="builder">URL builder</div>
+      <div class="mode-tab" data-mode="raw">Raw URL list</div>
+    </div>
+
+    <div class="mode-panel active" id="zi-builder">
+      <label>Cities <span style="font-weight:400;text-transform:none;font-size:12px">(one per line: state, city)</span></label>
+      <textarea name="cities" rows="6"
+        placeholder="indiana, gary&#10;indiana, hammond&#10;wisconsin, kenosha"></textarea>
+
+      <p class="section-title">Industries</p>
+      <div class="select-all-row">
+        <button type="button" class="link-btn" onclick="setAll('ind',true)">Select all</button>
+        <button type="button" class="link-btn" onclick="setAll('ind',false)">Clear</button>
+      </div>
+      <div class="check-grid" id="ind-grid"></div>
+      <input type="hidden" name="industries" id="zi-industries" />
+    </div>
+
+    <div class="mode-panel" id="zi-raw">
+      <label>URL templates <span style="font-weight:400;text-transform:none;font-size:12px">(use {page} placeholder)</span></label>
+      <textarea name="raw_urls" rows="8"
+        placeholder="https://www.zoominfo.com/companies-search/location-usa--indiana--gary-industry-manufacturing?pageNum={page}"></textarea>
+    </div>
+
+    <div class="row-2" style="margin-top:20px">
+      <div>
+        <label for="zi-max-pages">Max pages per URL</label>
+        <input type="number" id="zi-max-pages" name="max_pages" value="5" min="1" max="20" />
+      </div>
+      <div>
+        <label for="zi-min-co">Min companies to continue</label>
+        <input type="number" id="zi-min-co" name="min_companies" value="9" min="1" max="50" />
+      </div>
+    </div>
+
+    <div class="fmt-toggle">
+      <input type="radio" name="zi_fmt_radio" id="zi-csv" value="csv" checked
+        onchange="document.getElementById('zi-fmt').value='csv'"/>
+      <label for="zi-csv">CSV</label>
+      <input type="radio" name="zi_fmt_radio" id="zi-json" value="json"
+        onchange="document.getElementById('zi-fmt').value='json'"/>
+      <label for="zi-json">JSON</label>
+    </div>
+
+    <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+  </form>
+</section>

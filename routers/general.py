@@ -8,19 +8,19 @@ Routes:
 
 import time
 import webbrowser
-from pathlib import Path
 
 import pyautogui
 import pyperclip
+from jinja2 import Environment, FileSystemLoader
+
 from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from probes._common import open_console
 from shared import _Cache, _respond, _ts
 
-router = APIRouter()
-
-TEMPLATE_PATH = Path("templates/index.html")
+router  = APIRouter()
+_jinja  = Environment(loader=FileSystemLoader("templates"))
 
 _JS_COPY_ALL = r"""
 const allText = document.body.innerText;
@@ -65,7 +65,7 @@ def _scrape_url(url: str, wait: int = 5) -> dict:
 
 @router.get("/", response_class=HTMLResponse)
 async def home():
-    return HTMLResponse(content=TEMPLATE_PATH.read_text(encoding="utf-8"))
+    return HTMLResponse(_jinja.get_template("base.html").render())
 
 
 @router.post("/scrape")

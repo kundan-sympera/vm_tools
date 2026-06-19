@@ -1,0 +1,23 @@
+<section class="page active" id="page-general">
+  <h2>General scraper</h2>
+  <p class="page-sub">Paste any URLs — one per line — and download the text content.</p>
+
+  <form action="/scrape" method="post">
+    <input type="hidden" name="output_format" id="gen-fmt" value="csv" />
+
+    <label for="gen-urls">URLs</label>
+    <textarea id="gen-urls" name="urls" rows="8"
+      placeholder="https://example.com/page1&#10;https://example.com/page2"></textarea>
+
+    <div class="fmt-toggle">
+      <input type="radio" name="gen_fmt_radio" id="gen-csv" value="csv" checked
+        onchange="document.getElementById('gen-fmt').value='csv'"/>
+      <label for="gen-csv">CSV</label>
+      <input type="radio" name="gen_fmt_radio" id="gen-json" value="json"
+        onchange="document.getElementById('gen-fmt').value='json'"/>
+      <label for="gen-json">JSON</label>
+    </div>
+
+    <button type="submit" class="btn btn-blue">⬇ Run &amp; download</button>
+  </form>
+</section>

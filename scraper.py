@@ -22,7 +22,7 @@ import pyautogui
 import uvicorn
 from fastapi import FastAPI
 
-from routers import cache, general, stocks, zoominfo, zocdoc
+from routers import cache, company, general, grok, stocks, zoominfo, zocdoc
 
 # ── Browser warm-up ──────────────────────────
 pyautogui.PAUSE    = 0.8
@@ -49,6 +49,8 @@ app.include_router(zoominfo.router)
 app.include_router(stocks.router)
 app.include_router(zocdoc.router)
 app.include_router(cache.router)
+app.include_router(company.router)
+app.include_router(grok.router)
 
 
 @app.get("/health")

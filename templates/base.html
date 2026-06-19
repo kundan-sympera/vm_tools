@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VM Scraper</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w: 200px;
+      --bg:        #0f1117;
+      --sidebar:   #161b27;
+      --panel:     #1c2232;
+      --border:    #2a3347;
+      --accent:    #4f8ef7;
+      --accent2:   #34c97e;
+      --accent3:   #f7a94f;
+      --text:      #e2e8f0;
+      --muted:     #8892a4;
+      --danger:    #e05c5c;
+      --radius:    8px;
+      --mono:      'Cascadia Code', 'Fira Mono', 'Courier New', monospace;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 0 20px;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+    }
+
+    .sidebar-logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 0 20px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo span { color: var(--muted); font-weight: 400; }
+
+    .nav { margin-top: 16px; flex: 1; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+      border-left: 3px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
+      user-select: none;
+    }
+    .nav-item:hover  { color: var(--text); background: rgba(255,255,255,.03); }
+    .nav-item.active { color: var(--text); border-left-color: var(--accent); background: rgba(79,142,247,.06); }
+    .nav-item .icon  { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-links {
+      padding: 16px 20px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar-links a {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .sidebar-links a:hover { color: var(--accent); }
+
+    /* ── Main ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 36px 40px;
+      max-width: 860px;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .page-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 7px;
+      margin-top: 20px;
+    }
+    label:first-of-type { margin-top: 0; }
+
+    textarea, input[type="text"], input[type="number"], select {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      padding: 10px 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    textarea { font-family: var(--mono); resize: vertical; }
+    textarea:focus, input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    /* ── Radio toggle (CSV / JSON) ── */
+    .fmt-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      width: fit-content;
+      margin-top: 20px;
+    }
+    .fmt-toggle label {
+      margin: 0;
+      padding: 9px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: var(--muted);
+      background: var(--panel);
+      border: none;
+      transition: background .15s, color .15s;
+      user-select: none;
+    }
+    .fmt-toggle input[type="radio"] { display: none; }
+    .fmt-toggle input[type="radio"]:checked + label {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Checkbox grid ── */
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 5px;
+      transition: background .12s;
+    }
+    .check-item:hover { background: rgba(255,255,255,.04); }
+    .check-item input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .select-all-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .link-btn {
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .link-btn:hover { text-decoration: underline; }
+
+    /* ── Submit button ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 26px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      margin-top: 24px;
+    }
+    .btn:hover  { opacity: .88; }
+    .btn:active { transform: scale(.98); }
+    .btn-blue  { background: var(--accent);  color: #fff; }
+    .btn-green { background: var(--accent2); color: #fff; }
+
+    /* ── Row mode toggle (cities vs raw URLs) ── */
+    .mode-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .mode-tab {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+      user-select: none;
+    }
+    .mode-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+
+    /* ── Inline row of inputs ── */
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+    /* ── Accent dot for section titles ── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin: 28px 0 12px;
+    }
+
+    /* ── File input ── */
+    .file-input {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 10px 13px;
+      width: 100%;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">VM Scraper <span>v2</span></div>
+  <nav class="nav">
+    <div class="nav-item active" data-page="general"><span class="icon">⚙</span> General</div>
+    <div class="nav-item" data-page="zoominfo"><span class="icon">🔍</span> ZoomInfo</div>
+    <div class="nav-item" data-page="stocks"><span class="icon">📈</span> Indian Stocks</div>
+    <div class="nav-item" data-page="zocdoc"><span class="icon">🩺</span> ZocDoc</div>
+    <div class="nav-item" data-page="zocdoc-profiles"><span class="icon">📍</span> ZocDoc Profiles</div>
+    <div class="nav-item" data-page="company-extract"><span class="icon">🏢</span> Company Extract</div>
+    <div class="nav-item" data-page="grok"><span class="icon">🤖</span> Grok</div>
+  </nav>
+  <div class="sidebar-links">
+    <a href="/docs" target="_blank">📄 API docs</a>
+    <a href="/health" target="_blank">❤ Health</a>
+  </div>
+</aside>
+
+<main class="main">
+  {% include "pages/general.html" %}
+  {% include "pages/zoominfo.html" %}
+  {% include "pages/stocks.html" %}
+  {% include "pages/zocdoc.html" %}
+  {% include "pages/zocdoc_profiles.html" %}
+  {% include "pages/company_extract.html" %}
+  {% include "pages/grok.html" %}
+</main>
+
+<script>
+// ── Navigation ──────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+  });
+});
+
+// ── ZoomInfo mode tabs ───────────────────────────────────────
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('zi-' + tab.dataset.mode).classList.add('active');
+  });
+});
+
+// ── Checkbox grid builder ────────────────────────────────────
+const INDUSTRIES = [
+  "manufacturing-chemicals","manufacturing","construction-management","construction",
+  "transportation-rail-and-bus","transportation","transportation-freight",
+  "manufacturing-appliances","manufacturing-electronics"
+];
+const SECTORS = [
+  "abrasives/1","alcohol/3","media-entertainment/26","logistics/25","telecom/39",
+  "textile/40","ratings/35","information-technology/24","mining/27","photographic-product/32",
+  "aviation/5","fast-moving-consumer-goods/17","healthcare/19","gas-transmission/18",
+  "diamond-jewellery/12","automobile-ancillaries/4","agriculture/2","retailing/37",
+  "diversified/13","chemicals/8","trading/41","hospitality/20","industrials-gases-fuels/21",
+  "consumer-durables/10","paper/31","plastic-products/33","banking/6","other/30",
+  "finance/16","miscellaneous/28","power/34","electricals/14","infrastructure/22",
+  "construction-materials/9","capital-goods/7","realty/36","ship-building/38",
+  "iron-steel/23","crude-oil/11","non-ferrous-metals/29","ferro-manganese/15",
+];
+const SECTIONS = ["sector-gainers","sector-losers"];
+const PERIODS  = ["1D","1W","1M","3M","6M","1Y","3Y","5Y"];
+
+function buildGrid(containerId, items, namePrefix) {
+  const grid = document.getElementById(containerId);
+  items.forEach(item => {
+    const label = document.createElement('label');
+    label.className = 'check-item';
+    label.innerHTML = `<input type="checkbox" name="${namePrefix}" value="${item}" checked /><span>${item}</span>`;
+    grid.appendChild(label);
+  });
+}
+
+buildGrid('ind-grid', INDUSTRIES, 'ind');
+buildGrid('sec-grid', SECTORS,    'sec');
+buildGrid('sct-grid', SECTIONS,   'sct');
+buildGrid('per-grid', PERIODS,    'per');
+
+function setAll(prefix, checked) {
+  const grids = { ind:'ind-grid', sec:'sec-grid', sct:'sct-grid', per:'per-grid' };
+  document.querySelectorAll(`#${grids[prefix]} input[type=checkbox]`)
+    .forEach(cb => cb.checked = checked);
+}
+
+// ── ZoomInfo pack industries ─────────────────────────────────
+document.querySelector('#page-zoominfo form').addEventListener('submit', () => {
+  const checked = [...document.querySelectorAll('#ind-grid input:checked')].map(cb => cb.value);
+  document.getElementById('zi-industries').value = checked.join(',');
+});
+
+// ── Stocks pack selections ───────────────────────────────────
+function packStocks() {
+  const get = (gridId) =>
+    [...document.querySelectorAll(`#${gridId} input:checked`)].map(cb => cb.value).join(',');
+  document.getElementById('st-sectors').value  = get('sec-grid');
+  document.getElementById('st-sections').value = get('sct-grid');
+  document.getElementById('st-periods').value  = get('per-grid');
+}
+
+// ── Grok enrichment ─────────────────────────────────────────
+let grokFmt = 'csv';
+
+document.getElementById('grok-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = document.getElementById('grok-file').files[0];
+  if (!file) { alert('Please select a CSV file'); return; }
+
+  const btn    = document.getElementById('grok-btn');
+  const status = document.getElementById('grok-status');
+  btn.disabled = true;
+  status.style.display = 'inline';
+  status.textContent   = 'Processing…';
+
+  const body = new FormData();
+  body.append('csv_file', file);
+  body.append('system_prompt', document.getElementById('grok-prompt').value);
+  body.append('output_format', grokFmt);
+
+  try {
+    const res = await fetch('/probe/grok', { method: 'POST', body });
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Error: ' + (err.error || res.statusText));
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `grok_output.${grokFmt}`; a.click();
+    URL.revokeObjectURL(url);
+    status.textContent = 'Done!';
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { status.style.display = 'none'; }, 3000);
+  }
+});
+
+// ── Company extractor ────────────────────────────────────────
+document.getElementById('company-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = document.getElementById('co-file').files[0];
+  if (!file) { alert('Please select a CSV file'); return; }
+
+  const btn    = document.getElementById('co-btn');
+  const status = document.getElementById('co-status');
+  btn.disabled = true;
+  status.style.display = 'inline';
+  status.textContent   = 'Processing…';
+
+  const body = new FormData();
+  body.append('file', file);
+
+  try {
+    const res = await fetch('/service/company-extract', { method: 'POST', body });
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Error: ' + (err.error || res.statusText));
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'company_extraction_output.csv'; a.click();
+    URL.revokeObjectURL(url);
+    status.textContent = 'Done!';
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { status.style.display = 'none'; }, 3000);
+  }
+});
+</script>
+
+</body>
+</html>
