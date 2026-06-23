@@ -14,7 +14,8 @@ from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
 
 from probes import indian_stocks
-from shared import _Cache, _file_response, _stocks_key, _ts, DATA_DIR
+from shared import _file_response, _ts, DATA_DIR
+from utils.db import get_conn, ensure_cache_table, cache_get, cache_set, stocks_cache_key, CACHE_STOCKS
 
 router = APIRouter()
 
@@ -40,10 +41,15 @@ async def probe_stocks(
 
     print(f"[stocks] {len(sel_sectors)} sectors × {len(sel_sections)} sections × {len(sel_periods)} periods")
 
-    cache_key = _stocks_key(sel_sectors, sel_sections, sel_periods)
-    cached = _Cache.get(cache_key)
+    conn = get_conn()
+    ensure_cache_table(conn, CACHE_STOCKS)
+
+    cache_key = stocks_cache_key(sel_sectors, sel_sections, sel_periods)
+    cached = cache_get(conn, CACHE_STOCKS, cache_key)
+
     if cached is not None:
         print(f"[stocks cache hit] {len(cached)} rows")
+        conn.close()
         if not cached:
             return JSONResponse(status_code=200, content={"message": "No rows scraped"})
         pd.DataFrame(cached).to_csv(output_file, index=False)
@@ -55,8 +61,10 @@ async def probe_stocks(
             output_file=output_file,
         )
         if total == 0 or not os.path.exists(output_file):
+            conn.close()
             return JSONResponse(status_code=200, content={"message": "No rows scraped"})
-        _Cache.set(cache_key, pd.read_csv(output_file).to_dict(orient="records"))
+        cache_set(conn, CACHE_STOCKS, cache_key, pd.read_csv(output_file).to_dict(orient="records"))
+        conn.close()
 
     if output_format.lower() == "json":
         df = pd.read_csv(output_file)

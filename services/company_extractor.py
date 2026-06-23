@@ -13,7 +13,7 @@ from datetime import datetime
 import pandas as pd
 
 from prompts.company_extraction import SYSTEM_PROMPT, build_user_prompt
-from utils.db import get_conn, ensure_company_table
+from utils.db import get_conn, ensure_company_table, get_extracted_company
 from utils.llm import get_deepseek_response, parse_llm_response
 
 _FIELDS = ["website", "founded_year", "revenue", "ownership", "employees"]
@@ -92,14 +92,16 @@ def run(csv_bytes: bytes) -> bytes:
 
         print(f"[company_extractor] Processing pool_id={pool_id} — {name}")
 
-        user_prompt = build_user_prompt(name, address, details)
-        raw         = get_deepseek_response(SYSTEM_PROMPT, user_prompt)
-        extracted   = parse_llm_response(raw)
-
-        if not isinstance(extracted, dict):
-            extracted = {}
-
-        _upsert_company(conn, pool_id, pool_id_link, extracted, details)
+        extracted = get_extracted_company(conn, pool_id_link)
+        if extracted:
+            print(f"[company_extractor] cache hit for {pool_id_link}")
+        else:
+            user_prompt = build_user_prompt(name, address, details)
+            raw         = get_deepseek_response(SYSTEM_PROMPT, user_prompt)
+            extracted   = parse_llm_response(raw)
+            if not isinstance(extracted, dict):
+                extracted = {}
+            _upsert_company(conn, pool_id, pool_id_link, extracted, details)
 
         if extracted.get("name_check") is True:
             for field in _FIELDS:

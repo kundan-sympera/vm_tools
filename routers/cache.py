@@ -2,36 +2,48 @@
 routers/cache.py — Cache management endpoints
 
 Routes:
-  GET    /cache          → stats (entry count, DB size)
-  DELETE /cache          → wipe every entry
-  DELETE /cache/entry    → delete one entry by key (URL or stocks hash)
+  GET    /cache              → stats for every cache table
+  DELETE /cache              → wipe all scraper cache tables
+  DELETE /cache/{table}      → wipe one specific table
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from shared import _Cache
+from utils.db import get_conn, cache_stats, cache_clear, ALL_CACHE_TABLES
 
 router = APIRouter(tags=["Cache"], prefix="/cache")
 
 
 @router.get("")
-def cache_stats():
-    """Return the number of cached entries and SQLite DB size."""
-    return _Cache.stats()
+def get_cache_stats():
+    conn = get_conn()
+    stats = cache_stats(conn)
+    conn.close()
+    return stats
 
 
 @router.delete("")
-def cache_clear_all():
-    """Delete every cached entry."""
-    deleted = _Cache.clear_all()
-    return {"deleted": deleted, "message": f"Cleared {deleted} cache entries"}
+def clear_all_caches():
+    conn = get_conn()
+    deleted = {}
+    for table in ALL_CACHE_TABLES:
+        try:
+            deleted[table] = cache_clear(conn, table)
+        except Exception as exc:
+            deleted[table] = f"error: {exc}"
+    conn.close()
+    return {"cleared": deleted}
 
 
-@router.delete("/entry")
-def cache_delete_entry(key: str = Query(..., description="Exact URL or cache key to remove")):
-    """Delete a single cache entry by its key (URL or stocks hash)."""
-    found = _Cache.delete(key)
-    if not found:
-        return JSONResponse(status_code=404, content={"error": "Key not found in cache"})
-    return {"deleted": True, "key": key}
+@router.delete("/{table}")
+def clear_one_cache(table: str):
+    if table not in ALL_CACHE_TABLES:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Unknown table '{table}'. Valid: {ALL_CACHE_TABLES}"},
+        )
+    conn = get_conn()
+    deleted = cache_clear(conn, table)
+    conn.close()
+    return {"table": table, "deleted": deleted}

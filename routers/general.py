@@ -17,7 +17,8 @@ from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from probes._common import open_console
-from shared import _Cache, _respond, _ts
+from shared import _respond, _ts
+from utils.db import get_conn, ensure_cache_table, cache_get, cache_set, CACHE_GENERAL
 
 router  = APIRouter()
 _jinja  = Environment(loader=FileSystemLoader("templates"))
@@ -77,17 +78,21 @@ async def scrape_urls(
     if not url_list:
         return JSONResponse(status_code=400, content={"error": "No URLs provided"})
 
+    conn = get_conn()
+    ensure_cache_table(conn, CACHE_GENERAL)
+
     results = []
     for i, url in enumerate(url_list, 1):
-        cached = _Cache.get(url)
+        cached = cache_get(conn, CACHE_GENERAL, url)
         if cached is not None:
             print(f"[general cache hit] {url}")
             results.extend(cached)
             continue
         print(f"[general {i}/{len(url_list)}] {url}")
         result = _scrape_url(url)
-        _Cache.set(url, [result])
+        cache_set(conn, CACHE_GENERAL, url, [result])
         results.append(result)
         time.sleep(3)
 
+    conn.close()
     return _respond(results, output_format, "scraped")

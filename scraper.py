@@ -1,17 +1,19 @@
 """
 scraper.py — VM Scraper entry point
 
-Routes are split across routers/:
+Routes:
   routers/general.py   → GET /,  POST /scrape
   routers/zoominfo.py  → POST /probe/zoominfo
   routers/stocks.py    → POST /probe/stocks
   routers/zocdoc.py    → POST /probe/zocdoc, POST /probe/zocdoc-profiles
-
-Shared state (DATA_DIR, _Cache, helpers) lives in shared.py.
+  routers/grok.py      → POST /probe/grok
+  routers/company.py   → POST /service/company-extract
+  routers/explore.py   → GET  /explore/companies
+  routers/cache.py     → GET/DELETE /cache
 """
 
 from dotenv import load_dotenv
-load_dotenv()  # must run before any import that reads os.environ (pyautogui, webbrowser)
+load_dotenv()
 
 import os
 import webbrowser
@@ -22,14 +24,12 @@ import pyautogui
 import uvicorn
 from fastapi import FastAPI
 
-from routers import cache, company, explore, general, grok, pipeline, stocks, zoominfo, zocdoc
+from routers import cache, company, explore, general, grok, stocks, zoominfo, zocdoc
 
-# ── Browser warm-up ──────────────────────────
 pyautogui.PAUSE    = 0.8
 pyautogui.FAILSAFE = False
 webbrowser.open("example.com")
 
-# ── App ──────────────────────────────────────
 app = FastAPI(
     title="VM Scraper",
     description=(
@@ -41,6 +41,8 @@ app = FastAPI(
         "| `POST /probe/stocks` | Indian Stocks (StockEdge) |\n"
         "| `POST /probe/zocdoc` | ZocDoc provider listings |\n"
         "| `POST /probe/zocdoc-profiles` | ZocDoc doctor office locations |\n"
+        "| `POST /probe/grok` | Grok company enrichment |\n"
+        "| `POST /service/company-extract` | DeepSeek structured extraction |\n"
     ),
 )
 
@@ -52,7 +54,6 @@ app.include_router(cache.router)
 app.include_router(company.router)
 app.include_router(explore.router)
 app.include_router(grok.router)
-app.include_router(pipeline.router)
 
 
 @app.get("/health")

@@ -14,7 +14,8 @@ from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
 
 from probes import zocdoc_profile_scraper, zocdoc_scraper
-from shared import _Cache, _file_response, _ts, DATA_DIR
+from shared import _file_response, _ts, DATA_DIR
+from utils.db import get_conn, ensure_cache_table, cache_get, cache_set, CACHE_ZOCDOC, CACHE_ZOCDOC_PROFILE
 
 router = APIRouter(tags=["ZocDoc"])
 
@@ -32,15 +33,6 @@ async def probe_zocdoc(
     max_pages:           int           = Form(default=0,     description="Per-URL page cap; 0 = use total-results count"),
     output_format:       str           = Form(default="csv", description="csv or json"),
 ):
-    """
-    Scrape one or more ZocDoc city/specialty listing pages.
-
-    Paginates automatically (appends /2, /3, …) until all providers are
-    collected or `max_pages` is reached. Results are deduplicated by
-    name+address and profile_url before download.
-
-    **Columns:** name, specialty, address, profile_url, accepting_new_patients, Source URL, Source
-    """
     url_list: list = []
     if url and url.strip():
         url_list.append(url.strip())
@@ -50,11 +42,14 @@ async def probe_zocdoc(
     if not url_list:
         return JSONResponse(status_code=400, content={"error": "No URLs provided"})
 
+    conn = get_conn()
+    ensure_cache_table(conn, CACHE_ZOCDOC)
+
     ts = _ts()
     all_rows: list = []
 
     for idx, u in enumerate(url_list, 1):
-        cached = _Cache.get(u)
+        cached = cache_get(conn, CACHE_ZOCDOC, u)
         if cached is not None:
             print(f"[zocdoc cache hit] {u}")
             all_rows.extend(cached)
@@ -67,8 +62,10 @@ async def probe_zocdoc(
             max_pages=max_pages,
             log=print,
         )
-        _Cache.set(u, rows)
+        cache_set(conn, CACHE_ZOCDOC, u, rows)
         all_rows.extend(rows)
+
+    conn.close()
 
     if not all_rows:
         return JSONResponse(status_code=200, content={"message": "No providers scraped"})
@@ -103,15 +100,6 @@ async def probe_zocdoc_profiles(
     page_load_wait: int           = Form(default=8,     description="Seconds to wait after each page load"),
     output_format:  str           = Form(default="csv", description="csv or json"),
 ):
-    """
-    Extract office locations from ZocDoc doctor profile pages.
-
-    Uses DevTools JS injection to parse `[itemprop="address"]` structured-data
-    cards. Falls back to single-location text extraction when no cards are found.
-    Only the first (primary) office per profile is kept.
-
-    **Columns:** profile_url, company_name, company_address, Source
-    """
     url_list: list = []
     if url and url.strip():
         url_list.append(url.strip())
@@ -121,11 +109,14 @@ async def probe_zocdoc_profiles(
     if not url_list:
         return JSONResponse(status_code=400, content={"error": "No URLs provided"})
 
+    conn = get_conn()
+    ensure_cache_table(conn, CACHE_ZOCDOC_PROFILE)
+
     ts = _ts()
     all_rows: list = []
 
     for idx, u in enumerate(url_list, 1):
-        cached = _Cache.get(u)
+        cached = cache_get(conn, CACHE_ZOCDOC_PROFILE, u)
         if cached is not None:
             print(f"[zocdoc-profiles cache hit] {u}")
             all_rows.extend(cached)
@@ -136,8 +127,10 @@ async def probe_zocdoc_profiles(
             page_load_wait=page_load_wait,
             log=print,
         )
-        _Cache.set(u, rows)
+        cache_set(conn, CACHE_ZOCDOC_PROFILE, u, rows)
         all_rows.extend(rows)
+
+    conn.close()
 
     if not all_rows:
         return JSONResponse(status_code=200, content={"message": "No office locations scraped"})

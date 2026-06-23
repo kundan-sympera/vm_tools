@@ -14,19 +14,17 @@ from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
 
 from probes import zoominfo
-from shared import _Cache, _file_response, _ts, DATA_DIR
+from shared import _file_response, _ts, DATA_DIR
+from utils.db import get_conn, ensure_cache_table, cache_get, cache_set, CACHE_ZOOMINFO
 
 router = APIRouter()
 
 
 @router.post("/probe/zoominfo")
 async def probe_zoominfo(
-    # builder mode
     cities:        Optional[str] = Form(default=None, description="One city per line: state, city"),
     industries:    Optional[str] = Form(default=None, description="Comma-separated industry slugs"),
-    # raw mode
     raw_urls:      Optional[str] = Form(default=None, description="Raw URL templates, one per line"),
-    # shared
     max_pages:     int           = Form(default=5),
     min_companies: int           = Form(default=9),
     output_format: str           = Form(default="csv"),
@@ -48,9 +46,12 @@ async def probe_zoominfo(
 
     print(f"[zoominfo] {len(url_list)} URL templates, max_pages={max_pages}")
 
+    conn = get_conn()
+    ensure_cache_table(conn, CACHE_ZOOMINFO)
+
     all_rows: list = []
     for u in url_list:
-        cached = _Cache.get(u)
+        cached = cache_get(conn, CACHE_ZOOMINFO, u)
         if cached is not None:
             print(f"[zoominfo cache hit] {u}")
             all_rows.extend(cached)
@@ -59,9 +60,11 @@ async def probe_zoominfo(
         count = zoominfo.scrape(urls=[u], output_file=tmp, max_pages=max_pages, min_companies=min_companies)
         if count > 0 and os.path.exists(tmp):
             rows = pd.read_csv(tmp).to_dict(orient="records")
-            _Cache.set(u, rows)
+            cache_set(conn, CACHE_ZOOMINFO, u, rows)
             all_rows.extend(rows)
             os.remove(tmp)
+
+    conn.close()
 
     if not all_rows:
         return JSONResponse(status_code=200, content={"message": "No rows scraped"})
