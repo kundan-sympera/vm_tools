@@ -11,9 +11,11 @@ Each input dict must have:  pool_id, pool_id_link, validated_name, validated_add
 Each output dict has:       pool_id, pool_id_link, validated_name, validated_address, details, status
 """
 
+import os
 import time
 import webbrowser
 
+import psycopg2
 import pyautogui
 import pyperclip
 
@@ -135,6 +137,52 @@ GROK_URL = "https://grok.com/"
 
 
 # ─────────────────────────────────────────────
+#  DB helpers (cache by pool_id_link)
+# ─────────────────────────────────────────────
+
+def _get_conn():
+	url = os.getenv("DATABASE_URL")
+	if not url:
+		return None
+	return psycopg2.connect(url)
+
+
+def _get_cached_details(conn, pool_id_link: str) -> str | None:
+	"""Return existing details if >= 100 chars, else None (forces re-scrape)."""
+	with conn.cursor() as cur:
+		cur.execute(
+			"SELECT details FROM company_information WHERE pool_id_link = %s ORDER BY created_at DESC LIMIT 1",
+			(pool_id_link,),
+		)
+		row = cur.fetchone()
+	if row is None:
+		return None
+	details = row[0] or ""
+	return details if len(details) >= 100 else None
+
+
+def _save_details(conn, pool_id: str, pool_id_link: str, details: str) -> None:
+	"""Insert a new row or update the most-recent row for this pool_id_link."""
+	with conn.cursor() as cur:
+		cur.execute(
+			"SELECT id FROM company_information WHERE pool_id_link = %s ORDER BY created_at DESC LIMIT 1",
+			(pool_id_link,),
+		)
+		row = cur.fetchone()
+		if row:
+			cur.execute(
+				"UPDATE company_information SET details = %s, created_at = NOW() WHERE id = %s",
+				(details, row[0]),
+			)
+		else:
+			cur.execute(
+				"INSERT INTO company_information (pool_id, pool_id_link, details) VALUES (%s, %s, %s)",
+				(str(pool_id), str(pool_id_link), details),
+			)
+	conn.commit()
+
+
+# ─────────────────────────────────────────────
 #  Internal helpers
 # ─────────────────────────────────────────────
 
@@ -248,25 +296,59 @@ def scrape(
 		return []
 
 	prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
-	results: list[dict] = []
-	total = len(companies)
+	results_by_idx: dict[int, dict] = {}
 
-	for batch_start in range(0, total, BATCH_SIZE):
-		batch = companies[batch_start : batch_start + BATCH_SIZE]
+	# ── DB connection (best-effort; scraper still works without it) ──
+	conn = None
+	try:
+		conn = _get_conn()
+	except Exception as exc:
+		print(f"[grok] DB unavailable, cache disabled: {exc}")
+
+	# ── Phase 1: resolve cache hits ──
+	to_scrape: list[tuple[int, dict]] = []
+	for idx, row in enumerate(companies):
+		pool_id_link = str(row.get("pool_id_link", ""))
+		cached = None
+		if conn and pool_id_link:
+			try:
+				cached = _get_cached_details(conn, pool_id_link)
+			except Exception as exc:
+				print(f"[grok] DB read failed for {pool_id_link}: {exc}")
+
+		if cached:
+			print(f"[grok] cache hit  — {row.get('validated_name', '')} ({pool_id_link})")
+			results_by_idx[idx] = {
+				"pool_id":           row.get("pool_id", idx + 1),
+				"pool_id_link":      pool_id_link,
+				"validated_name":    str(row.get("validated_name", "")).strip(),
+				"validated_address": str(row.get("validated_address", "")).strip(),
+				"details":           cached,
+				"status":            "cached",
+			}
+		else:
+			to_scrape.append((idx, row))
+
+	n_cached = len(results_by_idx)
+	n_scrape = len(to_scrape)
+	print(f"[grok] {n_cached} cached, {n_scrape} to scrape.")
+
+	# ── Phase 2: batch-scrape the rest ──
+	for batch_start in range(0, n_scrape, BATCH_SIZE):
+		batch = to_scrape[batch_start : batch_start + BATCH_SIZE]
 		batch_num = batch_start // BATCH_SIZE + 1
 		batch_end = batch_start + len(batch)
 
-		print(f"[grok] Opening Grok — batch {batch_num} (companies {batch_start + 1}–{batch_end}/{total}) …")
+		print(f"[grok] Opening Grok — batch {batch_num} ({batch_start + 1}–{batch_end}/{n_scrape}) …")
 		_open_grok_with_system_prompt(prompt)
 
-		for j, row in enumerate(batch, 1):
-			i = batch_start + j
-			pool_id           = row.get("pool_id", i)
-			pool_id_link      = row.get("pool_id_link", "")
+		for j, (orig_idx, row) in enumerate(batch, 1):
+			pool_id           = row.get("pool_id", orig_idx + 1)
+			pool_id_link      = str(row.get("pool_id_link", ""))
 			validated_name    = str(row.get("validated_name", "")).strip()
 			validated_address = str(row.get("validated_address", "")).strip()
 
-			print(f"[grok {i}/{total}] {validated_name} | {validated_address}")
+			print(f"[grok {batch_start + j}/{n_scrape}] {validated_name} | {validated_address}")
 
 			try:
 				details = _query_company(validated_name, validated_address)
@@ -275,27 +357,37 @@ def scrape(
 				details = f"ERROR: {exc}"
 				status  = "error"
 
-			results.append(
-				{
-					"pool_id":           pool_id,
-					"pool_id_link":      pool_id_link,
-					"validated_name":    validated_name,
-					"validated_address": validated_address,
-					"details":           details,
-					"status":            status,
-				}
-			)
+			if conn and pool_id_link and status != "error":
+				try:
+					_save_details(conn, pool_id, pool_id_link, details)
+				except Exception as exc:
+					print(f"[grok] DB save failed for {pool_id_link}: {exc}")
+
+			results_by_idx[orig_idx] = {
+				"pool_id":           pool_id,
+				"pool_id_link":      pool_id_link,
+				"validated_name":    validated_name,
+				"validated_address": validated_address,
+				"details":           details,
+				"status":            status,
+			}
 
 			if j < len(batch):
 				time.sleep(BETWEEN_COMPANY_WAIT)
 
-		# Close the tab after each batch
 		pyautogui.hotkey("ctrl", "w")
 		print(f"[grok] Batch {batch_num} done — tab closed.")
 
-		if batch_end < total:
+		if batch_end < n_scrape:
 			print(f"[grok] Waiting {SESSION_RESET_WAIT}s before next batch …")
 			time.sleep(SESSION_RESET_WAIT)
 
-	print(f"[grok] Done — {total} companies processed.")
-	return results
+	if conn:
+		try:
+			conn.close()
+		except Exception:
+			pass
+
+	total = len(companies)
+	print(f"[grok] Done — {total} companies ({n_cached} cached, {n_scrape} scraped).")
+	return [results_by_idx[i] for i in range(total)]
