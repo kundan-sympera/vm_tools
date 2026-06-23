@@ -8,45 +8,16 @@ DB table          : company_information (one row per company)
 """
 
 import io
-import os
 from datetime import datetime
 
 import pandas as pd
 import psycopg2
 
 from prompts.company_extraction import SYSTEM_PROMPT, build_user_prompt
+from utils.db import get_conn, ensure_company_table
 from utils.llm import get_deepseek_response, parse_llm_response
 
 _FIELDS = ["website", "founded_year", "revenue", "ownership", "employees"]
-
-_CREATE_TABLE = """
-    CREATE TABLE IF NOT EXISTS company_information (
-        id           SERIAL PRIMARY KEY,
-        pool_id      TEXT,
-        pool_id_link TEXT NOT NULL,
-        name_check   BOOLEAN,
-        website      TEXT,
-        founded_year TEXT,
-        revenue      TEXT,
-        ownership    TEXT,
-        employees    TEXT,
-        details      TEXT,
-        created_at   TIMESTAMP DEFAULT NOW()
-    )
-"""
-
-
-def _get_conn():
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL not set")
-    return psycopg2.connect(url)
-
-
-def _ensure_table(conn):
-    with conn.cursor() as cur:
-        cur.execute(_CREATE_TABLE)
-    conn.commit()
 
 
 def _upsert_company(conn, pool_id: str, pool_id_link: str, extracted: dict, details: str):
@@ -84,8 +55,8 @@ def run(csv_bytes: bytes) -> bytes:
     if missing:
         raise ValueError(f"Input CSV missing columns: {missing}")
 
-    conn = _get_conn()
-    _ensure_table(conn)
+    conn = get_conn()
+    ensure_company_table(conn)
 
     output_rows = []
 

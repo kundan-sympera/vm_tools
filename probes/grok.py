@@ -11,15 +11,14 @@ Each input dict must have:  pool_id, pool_id_link, validated_name, validated_add
 Each output dict has:       pool_id, pool_id_link, validated_name, validated_address, details, status
 """
 
-import os
 import time
 import webbrowser
 
-import psycopg2
 import pyautogui
 import pyperclip
 
 import screen_positions  # must expose GROK_COPY_1080p (with .x / .y)
+from utils.db import get_conn, get_details, save_details
 
 # ─────────────────────────────────────────────
 #  Constants
@@ -134,52 +133,6 @@ BATCH_SIZE = 10
 SESSION_RESET_WAIT = 30
 
 GROK_URL = "https://grok.com/"
-
-
-# ─────────────────────────────────────────────
-#  DB helpers (cache by pool_id_link)
-# ─────────────────────────────────────────────
-
-def _get_conn():
-	url = os.getenv("DATABASE_URL")
-	if not url:
-		return None
-	return psycopg2.connect(url)
-
-
-def _get_cached_details(conn, pool_id_link: str) -> str | None:
-	"""Return existing details if >= 100 chars, else None (forces re-scrape)."""
-	with conn.cursor() as cur:
-		cur.execute(
-			"SELECT details FROM company_information WHERE pool_id_link = %s ORDER BY created_at DESC LIMIT 1",
-			(pool_id_link,),
-		)
-		row = cur.fetchone()
-	if row is None:
-		return None
-	details = row[0] or ""
-	return details if len(details) >= 100 else None
-
-
-def _save_details(conn, pool_id: str, pool_id_link: str, details: str) -> None:
-	"""Insert a new row or update the most-recent row for this pool_id_link."""
-	with conn.cursor() as cur:
-		cur.execute(
-			"SELECT id FROM company_information WHERE pool_id_link = %s ORDER BY created_at DESC LIMIT 1",
-			(pool_id_link,),
-		)
-		row = cur.fetchone()
-		if row:
-			cur.execute(
-				"UPDATE company_information SET details = %s, created_at = NOW() WHERE id = %s",
-				(details, row[0]),
-			)
-		else:
-			cur.execute(
-				"INSERT INTO company_information (pool_id, pool_id_link, details) VALUES (%s, %s, %s)",
-				(str(pool_id), str(pool_id_link), details),
-			)
-	conn.commit()
 
 
 # ─────────────────────────────────────────────
@@ -301,7 +254,7 @@ def scrape(
 	# ── DB connection (best-effort; scraper still works without it) ──
 	conn = None
 	try:
-		conn = _get_conn()
+		conn = get_conn()
 	except Exception as exc:
 		print(f"[grok] DB unavailable, cache disabled: {exc}")
 
@@ -312,7 +265,7 @@ def scrape(
 		cached = None
 		if conn and pool_id_link:
 			try:
-				cached = _get_cached_details(conn, pool_id_link)
+				cached = get_details(conn, pool_id_link)
 			except Exception as exc:
 				print(f"[grok] DB read failed for {pool_id_link}: {exc}")
 
@@ -359,7 +312,7 @@ def scrape(
 
 			if conn and pool_id_link and status != "error":
 				try:
-					_save_details(conn, pool_id, pool_id_link, details)
+					save_details(conn, pool_id, pool_id_link, details)
 				except Exception as exc:
 					print(f"[grok] DB save failed for {pool_id_link}: {exc}")
 

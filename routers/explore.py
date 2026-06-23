@@ -6,25 +6,19 @@ Routes:
   GET /explore/companies/{id}      → single full row
 """
 
-import os
-
-import psycopg2
 import psycopg2.extras
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+from utils.db import get_conn
+
 router = APIRouter(tags=["Explore"], prefix="/explore")
-
-
-def _connect():
-    url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/vm_tools_cache")
-    return psycopg2.connect(url)
 
 
 @router.get("/companies")
 def list_companies(search: str = Query("", description="Filter pool_id (case-insensitive)")):
     try:
-        conn = _connect()
+        conn = get_conn()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if search.strip():
                 cur.execute(
@@ -56,7 +50,7 @@ def list_companies(search: str = Query("", description="Filter pool_id (case-ins
 @router.get("/companies/{company_id}")
 def get_company(company_id: int):
     try:
-        conn = _connect()
+        conn = get_conn()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
