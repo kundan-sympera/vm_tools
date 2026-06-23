@@ -33,7 +33,9 @@ Public Official Links: (for this first verify that the links work and is active)
 •	Website:
 •	LinkedIn:
 •	Other relevant links:
+
 Founded Year:
+Employee count: (tightened range which is as accurate as possible for the company)
 does the company have alternative names, DBA , previous names? [We need this for the UCC]
 Company ownership: Subsidiary, private, family-owned business, Private-Equity Backed
 Is it a public company?
@@ -41,14 +43,13 @@ Is the company a subsidiary or a division of another company
 Is the company a subsidiary of a foreign company
 Is this company working with the government and wins federal contracts?
 Is the company active?
-
 Revenue:
-The company revenue estimation, a range is fine. 
-For companies in the focus group, you can also provide an estimation based on number of employees for this try to get as accurate and tight range for employees as possible. 
-Also use the following ranges for revenue <1M$, 1-3M$, 3-5M$, 5-20M$,20-30M$, ,30-50M$, 50-100M$, 100-130M$, >130M$, clear distintion between 5-30M$, 30-50M is required, same goes for 100-130M$ and >130M$,
-Try to provide proof
-If there are conflicts, present two estimations
-Employes based model:
+Use multiple methods to estimate revenue and provide a summary, first do research online and try to fine links like zoominfo or others which have revenue, else try to get an estimation based on data you are able to fine, and in 3rd step use the employee based model provided below to estimate revenue a third way, combine all 3 to get a more accurate data.
+
+The company revenue estimation, the range is fine. 
+Also use the following ranges for revenue <1M$, 1-3M$, 3-5M$, 5-20M$,20-30M$, ,30-50M$, 50-100M$, 100-130M$, >130M$, clear distinction between 5-30M$, 30-50M is required, same goes for 100-130M$ and >130M$,
+Try to provide proof If there are conflicts, present two estimations
+Employes based model: (see that the avg rpe is based on NY/NJ if the company belongs to another city and state use the values accordingly based on that city for Avg RPE)
 Industry	$1M – $3M Revenue (Headcount)	$3M – $6M Revenue (Headcount)	Avg. RPE (NY/NJ)
 Legal Services (Boutique)	3 – 10 employees	10 – 22 employees	~$275k – $325k
 Management Consulting	4 – 11 employees	11 – 22 employees	~$265k
@@ -106,6 +107,7 @@ For example :  The firm is an active donor to local academic funds and a long-st
  For every growth signal, award, or rating mentioned, provide a direct URL link to the source (e.g., the Angi profile, the SuperLawyers listing, or the official press release).
  Verification Rule: Do not include a signal if you cannot provide a functioning link to verify it. If a link is not available, list the signal as "Unverified" or omit it.
 
+Always format links in Markdown as [descriptive link text](full URL) for clickable hyperlinks. Do not use inline citations like [web:xx] or plain URLs without text.
 """
 
 # Seconds to wait after opening Grok before typing
@@ -115,10 +117,10 @@ BROWSER_OPEN_WAIT = 10
 SYSTEM_PROMPT_WAIT = 30
 
 # Seconds to wait for Grok to respond to each company query
-COMPANY_QUERY_WAIT = 30
+COMPANY_QUERY_WAIT = 45
 
 # Seconds to wait after clicking the copy button
-COPY_WAIT = 3
+COPY_WAIT = 2
 
 # Seconds to wait after click
 CLICK_WAIT = 0.5
@@ -127,7 +129,7 @@ CLICK_WAIT = 0.5
 BETWEEN_COMPANY_WAIT = 2
 
 # Number of companies to scrape before resetting the Grok session
-BATCH_SIZE = 10
+BATCH_SIZE = 5
 
 # Seconds to wait after closing the tab before reopening Grok
 SESSION_RESET_WAIT = 30

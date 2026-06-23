@@ -11,7 +11,6 @@ import io
 from datetime import datetime
 
 import pandas as pd
-import psycopg2
 
 from prompts.company_extraction import SYSTEM_PROMPT, build_user_prompt
 from utils.db import get_conn, ensure_company_table
@@ -22,23 +21,47 @@ _FIELDS = ["website", "founded_year", "revenue", "ownership", "employees"]
 
 def _upsert_company(conn, pool_id: str, pool_id_link: str, extracted: dict, details: str):
     with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO company_information
-                (pool_id, pool_id_link, name_check, website, founded_year, revenue, ownership, employees, details, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-        """, (
-            str(pool_id),
-            str(pool_id_link),
-            extracted.get("name_check", False),
-            extracted.get("website", ""),
-            extracted.get("founded_year", ""),
-            extracted.get("revenue", ""),
-            extracted.get("ownership", ""),
-            extracted.get("employees", ""),
-            details,
-            datetime.now(),
-        ))
+        cur.execute(
+            "SELECT id FROM company_information WHERE pool_id_link = %s ORDER BY created_at DESC LIMIT 1",
+            (pool_id_link,),
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute("""
+                UPDATE company_information
+                SET pool_id=%(pool_id)s, name_check=%(name_check)s, website=%(website)s,
+                    founded_year=%(founded_year)s, revenue=%(revenue)s, ownership=%(ownership)s,
+                    employees=%(employees)s, details=%(details)s, created_at=%(created_at)s
+                WHERE id=%(id)s
+            """, {
+                "id":           row[0],
+                "pool_id":      str(pool_id),
+                "name_check":   extracted.get("name_check", False),
+                "website":      extracted.get("website", ""),
+                "founded_year": extracted.get("founded_year", ""),
+                "revenue":      extracted.get("revenue", ""),
+                "ownership":    extracted.get("ownership", ""),
+                "employees":    extracted.get("employees", ""),
+                "details":      details,
+                "created_at":   datetime.now(),
+            })
+        else:
+            cur.execute("""
+                INSERT INTO company_information
+                    (pool_id, pool_id_link, name_check, website, founded_year, revenue, ownership, employees, details, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                str(pool_id),
+                str(pool_id_link),
+                extracted.get("name_check", False),
+                extracted.get("website", ""),
+                extracted.get("founded_year", ""),
+                extracted.get("revenue", ""),
+                extracted.get("ownership", ""),
+                extracted.get("employees", ""),
+                details,
+                datetime.now(),
+            ))
     conn.commit()
 
 

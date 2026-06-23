@@ -32,8 +32,17 @@ def get_deepseek_response(system_prompt: str, user_prompt: str, model: str = Non
 
 
 def parse_llm_response(content: str) -> dict | str:
+    if not content:
+        print("[LLM] parse_llm_response received empty string (LLM call likely failed)")
+        return {}
+
     start = content.find("{")
     end   = content.rfind("}") + 1
+
+    if start == -1 or end == 0:
+        print(f"[LLM] No JSON object found in response, raw: {content[:200]}")
+        return {}
+
     json_string = content[start:end]
 
     if json_string.startswith("{{") and json_string.endswith("}}"):
