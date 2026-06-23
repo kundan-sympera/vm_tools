@@ -24,7 +24,7 @@ import pyautogui
 import uvicorn
 from fastapi import FastAPI
 
-from routers import cache, company, explore, general, grok, stocks, zoominfo, zocdoc
+from routers import cache, company, general, grok, stocks, zoominfo, zocdoc
 
 pyautogui.PAUSE    = 0.8
 pyautogui.FAILSAFE = False
@@ -52,7 +52,6 @@ app.include_router(stocks.router)
 app.include_router(zocdoc.router)
 app.include_router(cache.router)
 app.include_router(company.router)
-app.include_router(explore.router)
 app.include_router(grok.router)
 
 

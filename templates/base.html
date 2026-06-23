@@ -292,8 +292,6 @@
     <div class="nav-item" data-page="zocdoc-profiles"><span class="icon">📍</span> ZocDoc Profiles</div>
     <div class="nav-item" data-page="company-extract"><span class="icon">🏢</span> Company Extract</div>
     <div class="nav-item" data-page="grok"><span class="icon">🤖</span> Grok</div>
-    <div class="nav-item" data-page="pipeline"><span class="icon">⚡</span> Pipeline</div>
-    <div class="nav-item" data-page="explore-company"><span class="icon">🗄</span> Explore Company</div>
   </nav>
   <div class="sidebar-links">
     <a href="/docs" target="_blank">📄 API docs</a>
@@ -309,8 +307,6 @@
   {% include "pages/zocdoc_profiles.html" %}
   {% include "pages/company_extract.html" %}
   {% include "pages/grok.html" %}
-  {% include "pages/pipeline.html" %}
-  {% include "pages/explore_company.html" %}
 </main>
 
 <script>
@@ -389,43 +385,6 @@ function packStocks() {
   document.getElementById('st-sections').value = get('sct-grid');
   document.getElementById('st-periods').value  = get('per-grid');
 }
-
-// ── Pipeline ─────────────────────────────────────────────────
-document.getElementById('pipeline-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const file = document.getElementById('pl-file').files[0];
-  if (!file) { alert('Please select a CSV file'); return; }
-
-  const btn    = document.getElementById('pl-btn');
-  const status = document.getElementById('pl-status');
-  btn.disabled = true;
-  status.style.display = 'inline';
-  status.textContent   = 'Running…';
-
-  const body = new FormData();
-  body.append('csv_file', file);
-  body.append('system_prompt', document.getElementById('pl-prompt').value);
-
-  try {
-    const res = await fetch('/pipeline/grok-to-extract', { method: 'POST', body });
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Error: ' + (err.error || res.statusText));
-      return;
-    }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'pipeline_output.csv'; a.click();
-    URL.revokeObjectURL(url);
-    status.textContent = 'Done!';
-  } catch (err) {
-    alert('Request failed: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    setTimeout(() => { status.style.display = 'none'; }, 3000);
-  }
-});
 
 // ── Grok enrichment ─────────────────────────────────────────
 let grokFmt = 'csv';
