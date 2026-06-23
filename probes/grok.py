@@ -125,6 +125,12 @@ CLICK_WAIT = 0.5
 # Seconds between companies (let UI settle)
 BETWEEN_COMPANY_WAIT = 2
 
+# Number of companies to scrape before resetting the Grok session
+BATCH_SIZE = 10
+
+# Seconds to wait after closing the tab before reopening Grok
+SESSION_RESET_WAIT = 30
+
 GROK_URL = "https://grok.com/"
 
 
@@ -243,41 +249,53 @@ def scrape(
 
 	prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 	results: list[dict] = []
-
-	print(f"[grok] Opening Grok with system prompt …")
-	_open_grok_with_system_prompt(prompt)
-
 	total = len(companies)
-	for i, row in enumerate(companies, 1):
-		pool_id           = row.get("pool_id", i)
-		pool_id_link      = row.get("pool_id_link", "")
-		validated_name    = str(row.get("validated_name", "")).strip()
-		validated_address = str(row.get("validated_address", "")).strip()
 
-		print(f"[grok {i}/{total}] {validated_name} | {validated_address}")
+	for batch_start in range(0, total, BATCH_SIZE):
+		batch = companies[batch_start : batch_start + BATCH_SIZE]
+		batch_num = batch_start // BATCH_SIZE + 1
+		batch_end = batch_start + len(batch)
 
-		try:
-			details = _query_company(validated_name, validated_address)
-			status  = "success" if len(details) > 50 else "partial"
-		except Exception as exc:
-			details = f"ERROR: {exc}"
-			status  = "error"
+		print(f"[grok] Opening Grok — batch {batch_num} (companies {batch_start + 1}–{batch_end}/{total}) …")
+		_open_grok_with_system_prompt(prompt)
 
-		results.append(
-			{
-				"pool_id":           pool_id,
-				"pool_id_link":      pool_id_link,
-				"validated_name":    validated_name,
-				"validated_address": validated_address,
-				"details":           details,
-				"status":            status,
-			}
-		)
+		for j, row in enumerate(batch, 1):
+			i = batch_start + j
+			pool_id           = row.get("pool_id", i)
+			pool_id_link      = row.get("pool_id_link", "")
+			validated_name    = str(row.get("validated_name", "")).strip()
+			validated_address = str(row.get("validated_address", "")).strip()
 
-		if i < total:
-			time.sleep(BETWEEN_COMPANY_WAIT)
+			print(f"[grok {i}/{total}] {validated_name} | {validated_address}")
 
-	# Close the Grok tab when done
-	pyautogui.hotkey("ctrl", "w")
+			try:
+				details = _query_company(validated_name, validated_address)
+				status  = "success" if len(details) > 50 else "partial"
+			except Exception as exc:
+				details = f"ERROR: {exc}"
+				status  = "error"
+
+			results.append(
+				{
+					"pool_id":           pool_id,
+					"pool_id_link":      pool_id_link,
+					"validated_name":    validated_name,
+					"validated_address": validated_address,
+					"details":           details,
+					"status":            status,
+				}
+			)
+
+			if j < len(batch):
+				time.sleep(BETWEEN_COMPANY_WAIT)
+
+		# Close the tab after each batch
+		pyautogui.hotkey("ctrl", "w")
+		print(f"[grok] Batch {batch_num} done — tab closed.")
+
+		if batch_end < total:
+			print(f"[grok] Waiting {SESSION_RESET_WAIT}s before next batch …")
+			time.sleep(SESSION_RESET_WAIT)
+
 	print(f"[grok] Done — {total} companies processed.")
 	return results
