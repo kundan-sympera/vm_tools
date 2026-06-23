@@ -5,7 +5,6 @@ Routes:
   POST /probe/stocks
 """
 
-import json
 import os
 from typing import Optional
 
@@ -67,13 +66,7 @@ async def probe_stocks(
         conn.close()
 
     if output_format.lower() == "json":
-        df = pd.read_csv(output_file)
-        jpath = output_file.replace(".csv", ".json")
-        with open(jpath, "w", encoding="utf-8") as f:
-            json.dump(
-                {"scraped_at": ts, "total": len(df), "results": df.to_dict(orient="records")},
-                f, indent=2, ensure_ascii=False,
-            )
-        return _file_response(jpath, "application/json", f"stocks_{ts}.json")
+        rows = pd.read_csv(output_file).to_dict(orient="records")
+        return JSONResponse(content={"scraped_at": ts, "total": len(rows), "results": rows})
 
     return _file_response(output_file, "text/csv", f"stocks_{ts}.csv")

@@ -23,8 +23,9 @@ VERSION = "1.0.0"
 import pyautogui
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from routers import cache, company, general, grok, stocks, zoominfo, zocdoc
+from routers import cache, company, explore, general, grok, stocks, zoominfo, zocdoc
 
 pyautogui.PAUSE    = 0.8
 pyautogui.FAILSAFE = False
@@ -43,7 +44,16 @@ app = FastAPI(
         "| `POST /probe/zocdoc-profiles` | ZocDoc doctor office locations |\n"
         "| `POST /probe/grok` | Grok company enrichment |\n"
         "| `POST /service/company-extract` | DeepSeek structured extraction |\n"
+        "| `GET /explore/companies` | Query extracted company DB |\n"
     ),
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(general.router)
@@ -53,6 +63,7 @@ app.include_router(zocdoc.router)
 app.include_router(cache.router)
 app.include_router(company.router)
 app.include_router(grok.router)
+app.include_router(explore.router)
 
 
 @app.get("/health")

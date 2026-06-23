@@ -5,7 +5,6 @@ Routes:
   POST /probe/zoominfo
 """
 
-import json
 import os
 from typing import Optional
 
@@ -72,13 +71,6 @@ async def probe_zoominfo(
     pd.DataFrame(all_rows).to_csv(output_file, index=False)
 
     if output_format.lower() == "json":
-        ts2 = _ts()
-        jpath = str(DATA_DIR / f"zoominfo_{ts2}.json")
-        with open(jpath, "w", encoding="utf-8") as f:
-            json.dump(
-                {"scraped_at": ts, "total": len(all_rows), "results": all_rows},
-                f, indent=2, ensure_ascii=False,
-            )
-        return _file_response(jpath, "application/json", f"zoominfo_{ts2}.json")
+        return JSONResponse(content={"scraped_at": ts, "total": len(all_rows), "results": all_rows})
 
     return _file_response(output_file, "text/csv", f"zoominfo_{ts}.csv")

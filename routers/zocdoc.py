@@ -6,7 +6,6 @@ Routes:
   POST /probe/zocdoc-profiles → office locations from doctor profile pages
 """
 
-import json
 from typing import Optional
 
 import pandas as pd
@@ -78,13 +77,7 @@ async def probe_zocdoc(
     df.to_csv(output_file, index=False)
 
     if output_format.lower() == "json":
-        jpath = str(DATA_DIR / f"zocdoc_{ts}.json")
-        with open(jpath, "w", encoding="utf-8") as f:
-            json.dump(
-                {"scraped_at": ts, "total": len(df), "results": df.to_dict(orient="records")},
-                f, indent=2, ensure_ascii=False,
-            )
-        return _file_response(jpath, "application/json", f"zocdoc_{ts}.json")
+        return JSONResponse(content={"scraped_at": ts, "total": len(df), "results": df.to_dict(orient="records")})
 
     return _file_response(output_file, "text/csv", f"zocdoc_{ts}.csv")
 
@@ -142,12 +135,6 @@ async def probe_zocdoc_profiles(
     df.to_csv(output_file, index=False)
 
     if output_format.lower() == "json":
-        jpath = str(DATA_DIR / f"zocdoc_profiles_{ts}.json")
-        with open(jpath, "w", encoding="utf-8") as f:
-            json.dump(
-                {"scraped_at": ts, "total": len(df), "results": df.to_dict(orient="records")},
-                f, indent=2, ensure_ascii=False,
-            )
-        return _file_response(jpath, "application/json", f"zocdoc_profiles_{ts}.json")
+        return JSONResponse(content={"scraped_at": ts, "total": len(df), "results": df.to_dict(orient="records")})
 
     return _file_response(output_file, "text/csv", f"zocdoc_profiles_{ts}.csv")

@@ -5,16 +5,15 @@ Exports:
   DATA_DIR          Path to output directory
   _ts()             Timestamp string
   _file_response()  FastAPI FileResponse helper
-  _respond()        Save results list → CSV/JSON FileResponse
+  _respond()        Return results as inline JSONResponse or CSV FileResponse
 """
 
-import json
 import os
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 DATA_DIR = Path("data")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -29,18 +28,12 @@ def _file_response(path: str, media_type: str, filename: str) -> FileResponse:
 
 
 def _respond(results: list, output_format: str, stem: str):
-    """Save results list and return a FileResponse (CSV or JSON)."""
+    """Return results as inline JSONResponse or CSV FileResponse."""
     ts = _ts()
     output_format = output_format.lower()
 
     if output_format == "json":
-        fpath = str(DATA_DIR / f"{stem}_{ts}.json")
-        with open(fpath, "w", encoding="utf-8") as f:
-            json.dump(
-                {"scraped_at": ts, "total": len(results), "results": results},
-                f, indent=2, ensure_ascii=False,
-            )
-        return _file_response(fpath, "application/json", f"{stem}_{ts}.json")
+        return JSONResponse(content={"scraped_at": ts, "total": len(results), "results": results})
 
     fpath = str(DATA_DIR / f"{stem}_{ts}.csv")
     pd.DataFrame(results).to_csv(fpath, index=False)
