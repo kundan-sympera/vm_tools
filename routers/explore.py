@@ -25,7 +25,7 @@ def list_companies(search: str = Query("", description="Filter pool_id (case-ins
                     """
                     SELECT id, pool_id, pool_id_link, name_check, website, created_at
                     FROM company_information
-                    WHERE pool_id ILIKE %s
+                    WHERE pool_id::text ILIKE %s
                     ORDER BY created_at DESC
                     LIMIT 500
                     """,
