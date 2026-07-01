@@ -76,61 +76,6 @@ CSV_EXTRACT_CODE = r"""
 """
 
 # ─────────────────────────────────────────────
-#  URL builder
-# ─────────────────────────────────────────────
-
-INDUSTRIES = [
-    "manufacturing-chemicals",
-    "manufacturing",
-    "construction-management",
-    "construction",
-    "transportation-rail-and-bus",
-    "transportation",
-    "transportation-freight",
-    "manufacturing-appliances",
-    "manufacturing-electronics",
-]
-
-BASE_URL = "https://www.zoominfo.com/companies-search/location-usa--{state}--{city}-industry-{industry}?pageNum={{page}}"
-
-
-def build_urls(cities: List[dict], industries: List[str]) -> List[str]:
-    """
-    cities: list of {"state": "indiana", "city": "gary"}
-    industries: list of industry slugs
-    Returns list of URL templates with {page} placeholder.
-    """
-    urls = []
-    for c in cities:
-        for ind in industries:
-            url = BASE_URL.format(
-                state=c["state"].lower().replace(" ", "-"),
-                city=c["city"].lower().replace(" ", "-"),
-                industry=ind,
-            )
-            urls.append(url)
-    return urls
-
-
-def parse_city_input(raw: str) -> List[dict]:
-    """
-    Accepts lines like:
-        indiana, gary
-        wisconsin, kenosha
-    Returns list of {"state": ..., "city": ...}
-    """
-    cities = []
-    for line in raw.strip().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) >= 2:
-            cities.append({"state": parts[0], "city": parts[1]})
-    return cities
-
-
-# ─────────────────────────────────────────────
 #  Block / captcha detection
 # ─────────────────────────────────────────────
 

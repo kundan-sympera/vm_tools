@@ -6,7 +6,6 @@ Routes:
 """
 
 import os
-from typing import Optional
 
 import pandas as pd
 from fastapi import APIRouter, Form
@@ -21,25 +20,15 @@ router = APIRouter()
 
 @router.post("/probe/zoominfo")
 async def probe_zoominfo(
-    cities:        Optional[str] = Form(default=None, description="One city per line: state, city"),
-    industries:    Optional[str] = Form(default=None, description="Comma-separated industry slugs"),
-    raw_urls:      Optional[str] = Form(default=None, description="Raw URL templates, one per line"),
-    max_pages:     int           = Form(default=5),
-    min_companies: int           = Form(default=9),
-    output_format: str           = Form(default="csv"),
+    raw_urls:      str = Form(..., description="Raw URL templates, one per line (use {page} placeholder)"),
+    max_pages:     int = Form(default=5),
+    min_companies: int = Form(default=9),
+    output_format: str = Form(default="csv"),
 ):
     ts = _ts()
     output_file = str(DATA_DIR / f"zoominfo_{ts}.csv")
 
-    if raw_urls and raw_urls.strip():
-        url_list = [u.strip() for u in raw_urls.splitlines() if u.strip()]
-    else:
-        city_list = zoominfo.parse_city_input(cities or "")
-        ind_list  = [i.strip() for i in (industries or "").split(",") if i.strip()]
-        if not ind_list:
-            ind_list = zoominfo.INDUSTRIES
-        url_list = zoominfo.build_urls(city_list, ind_list)
-
+    url_list = [u.strip() for u in raw_urls.splitlines() if u.strip()]
     if not url_list:
         return JSONResponse(status_code=400, content={"error": "No URLs resolved"})
 
