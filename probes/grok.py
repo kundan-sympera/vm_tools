@@ -25,7 +25,7 @@ from utils.db import get_conn, get_details, save_details
 # ─────────────────────────────────────────────
 
 GROK_RESPONSE_JS = r"""
-// === Grok Response Extractor (Markdown Tables + Inline Links) ===
+// === Grok Response Extractor (Better Clipboard Handling) ===
 const latest = [...document.querySelectorAll('div[class*="response-content-markdown"]')].pop();
 
 if (!latest) {
@@ -33,26 +33,22 @@ if (!latest) {
 } else {
   const clone = latest.cloneNode(true);
 
-  // ========== 1. Convert HTML Tables → Markdown Tables ==========
+  // Convert tables to markdown
   function convertTableToMarkdown(table) {
     const rows = table.querySelectorAll('tr');
     if (rows.length === 0) return '';
-
     let markdown = '';
     let isFirstRow = true;
 
     rows.forEach(row => {
       const cells = row.querySelectorAll('th, td');
       let rowText = '|';
-
       cells.forEach(cell => {
-        let content = cell.innerText.trim().replace(/\|/g, '\\|'); // escape pipes
+        let content = cell.innerText.trim().replace(/\|/g, '\\|');
         rowText += ` ${content} |`;
       });
-
       markdown += rowText + '\n';
 
-      // Add separator line after first row (header)
       if (isFirstRow) {
         let separator = '|';
         cells.forEach(() => separator += ' --- |');
@@ -60,46 +56,46 @@ if (!latest) {
         isFirstRow = false;
       }
     });
-
     return markdown;
   }
 
-  // Replace each <table> with its markdown version
   clone.querySelectorAll('table').forEach(table => {
-    const markdownTable = convertTableToMarkdown(table);
+    const mdTable = convertTableToMarkdown(table);
     const pre = document.createElement('pre');
-    pre.textContent = '\n' + markdownTable + '\n';
+    pre.textContent = '\n' + mdTable + '\n';
     table.replaceWith(pre);
   });
 
-  // ========== 2. Convert citation chips → Markdown links ==========
+  // Convert citation chips to markdown links
   clone.querySelectorAll('a[href]').forEach(link => {
     const url = link.getAttribute('href');
     if (!url || url.startsWith('#')) return;
-
-    let linkText = link.textContent.trim();
-    if (!linkText || linkText.length < 2) {
-      try {
-        linkText = new URL(url).hostname.replace('www.', '');
-      } catch {
-        linkText = 'Source';
-      }
-    }
-
-    const markdownLink = document.createTextNode(` [${linkText}](${url})`);
-    link.replaceWith(markdownLink);
+    let linkText = link.textContent.trim() || new URL(url).hostname.replace('www.', '');
+    const mdLink = document.createTextNode(` [${linkText}](${url})`);
+    link.replaceWith(mdLink);
   });
 
-  // ========== 3. Get final text + clean spacing ==========
   let cleanText = clone.innerText.trim();
-  cleanText = cleanText.replace(/\n{3,}/g, '\n\n'); // reduce excessive blank lines
+  cleanText = cleanText.replace(/\n{3,}/g, '\n\n');
 
-  // Copy to clipboard
+  // === Try multiple copy methods ===
+  let copied = false;
+
+  // Method 1: Modern Clipboard API
   navigator.clipboard.writeText(cleanText).then(() => {
-    console.log('%c[Success] Copied with markdown tables + inline citation links', 'color:#10b981; font-weight:bold');
+    console.log('%c[Success] Copied to clipboard!', 'color:#10b981; font-weight:bold');
+    copied = true;
   }).catch(() => {
-    console.log('%c[Clipboard failed] Output below:', 'color:#f59e0b');
-    console.log(cleanText);
+    // Method 2: Use console's built-in copy() helper (often works better)
+    try {
+      copy(cleanText);
+      console.log('%c[Success] Copied using copy() helper!', 'color:#10b981; font-weight:bold');
+      copied = true;
+    } catch (e) {
+      // Method 3: Show text clearly so user can copy manually
+      console.log('%c[Clipboard blocked] Copy the text below manually:', 'color:#f59e0b; font-weight:bold');
+      console.log(cleanText);
+    }
   });
 }
 """
