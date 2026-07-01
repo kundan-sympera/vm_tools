@@ -24,7 +24,87 @@ from utils.db import get_conn, get_details, save_details
 #  Constants
 # ─────────────────────────────────────────────
 
-DEFAULT_SYSTEM_PROMPT = """
+GROK_RESPONSE_JS = r"""
+// === Grok Response Extractor (Markdown Tables + Inline Links) ===
+const latest = [...document.querySelectorAll('div[class*="response-content-markdown"]')].pop();
+
+if (!latest) {
+  console.warn('No Grok response found.');
+} else {
+  const clone = latest.cloneNode(true);
+
+  // ========== 1. Convert HTML Tables → Markdown Tables ==========
+  function convertTableToMarkdown(table) {
+    const rows = table.querySelectorAll('tr');
+    if (rows.length === 0) return '';
+
+    let markdown = '';
+    let isFirstRow = true;
+
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('th, td');
+      let rowText = '|';
+
+      cells.forEach(cell => {
+        let content = cell.innerText.trim().replace(/\|/g, '\\|'); // escape pipes
+        rowText += ` ${content} |`;
+      });
+
+      markdown += rowText + '\n';
+
+      // Add separator line after first row (header)
+      if (isFirstRow) {
+        let separator = '|';
+        cells.forEach(() => separator += ' --- |');
+        markdown += separator + '\n';
+        isFirstRow = false;
+      }
+    });
+
+    return markdown;
+  }
+
+  // Replace each <table> with its markdown version
+  clone.querySelectorAll('table').forEach(table => {
+    const markdownTable = convertTableToMarkdown(table);
+    const pre = document.createElement('pre');
+    pre.textContent = '\n' + markdownTable + '\n';
+    table.replaceWith(pre);
+  });
+
+  // ========== 2. Convert citation chips → Markdown links ==========
+  clone.querySelectorAll('a[href]').forEach(link => {
+    const url = link.getAttribute('href');
+    if (!url || url.startsWith('#')) return;
+
+    let linkText = link.textContent.trim();
+    if (!linkText || linkText.length < 2) {
+      try {
+        linkText = new URL(url).hostname.replace('www.', '');
+      } catch {
+        linkText = 'Source';
+      }
+    }
+
+    const markdownLink = document.createTextNode(` [${linkText}](${url})`);
+    link.replaceWith(markdownLink);
+  });
+
+  // ========== 3. Get final text + clean spacing ==========
+  let cleanText = clone.innerText.trim();
+  cleanText = cleanText.replace(/\n{3,}/g, '\n\n'); // reduce excessive blank lines
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(cleanText).then(() => {
+    console.log('%c[Success] Copied with markdown tables + inline citation links', 'color:#10b981; font-weight:bold');
+  }).catch(() => {
+    console.log('%c[Clipboard failed] Output below:', 'color:#f59e0b');
+    console.log(cleanText);
+  });
+}
+"""
+
+DEFAULT_SYSTEM_PROMPT = r"""
 Please help me to answer the following questions for the company provided as input:
 The company’s main location, if you are not sure answer NA.
 Is the company’s physical headquarters/office address located within the following counties? (Ignore service areas/areas served): Yes / No"
