@@ -25,7 +25,7 @@ from utils.db import get_conn, get_details, save_details
 # ─────────────────────────────────────────────
 
 GROK_RESPONSE_JS = r"""
-// === Grok Response Extractor (Better Clipboard Handling) ===
+// === Grok Response Extractor - Robust Option B (Full Markdown) ===
 const latest = [...document.querySelectorAll('div[class*="response-content-markdown"]')].pop();
 
 if (!latest) {
@@ -33,68 +33,142 @@ if (!latest) {
 } else {
   const clone = latest.cloneNode(true);
 
-  // Convert tables to markdown
-  function convertTableToMarkdown(table) {
-    const rows = table.querySelectorAll('tr');
+  // ========== Table to Markdown ==========
+  function tableToMarkdown(table) {
+    const rows = Array.from(table.querySelectorAll('tr'));
     if (rows.length === 0) return '';
-    let markdown = '';
-    let isFirstRow = true;
 
-    rows.forEach(row => {
-      const cells = row.querySelectorAll('th, td');
-      let rowText = '|';
-      cells.forEach(cell => {
-        let content = cell.innerText.trim().replace(/\|/g, '\\|');
-        rowText += ` ${content} |`;
-      });
-      markdown += rowText + '\n';
+    let md = '';
+    rows.forEach((row, index) => {
+      const cells = Array.from(row.querySelectorAll('th, td')).map(cell =>
+        cell.innerText.trim().replace(/\|/g, '\\|')
+      );
+      md += '| ' + cells.join(' | ') + ' |\n';
 
-      if (isFirstRow) {
-        let separator = '|';
-        cells.forEach(() => separator += ' --- |');
-        markdown += separator + '\n';
-        isFirstRow = false;
+      if (index === 0) {
+        md += '| ' + cells.map(() => '---').join(' | ') + ' |\n';
       }
     });
-    return markdown;
+    return '\n' + md + '\n';
   }
 
+  // Replace all tables first
   clone.querySelectorAll('table').forEach(table => {
-    const mdTable = convertTableToMarkdown(table);
-    const pre = document.createElement('pre');
-    pre.textContent = '\n' + mdTable + '\n';
-    table.replaceWith(pre);
+    const mdTable = tableToMarkdown(table);
+    const wrapper = document.createElement('div');
+    wrapper.textContent = mdTable;
+    table.replaceWith(wrapper);
   });
 
-  // Convert citation chips to markdown links
-  clone.querySelectorAll('a[href]').forEach(link => {
-    const url = link.getAttribute('href');
-    if (!url || url.startsWith('#')) return;
-    let linkText = link.textContent.trim() || new URL(url).hostname.replace('www.', '');
-    const mdLink = document.createTextNode(` [${linkText}](${url})`);
-    link.replaceWith(mdLink);
-  });
+  // ========== Main Conversion Function ==========
+  function toMarkdown(node) {
+    if (!node) return '';
 
-  let cleanText = clone.innerText.trim();
-  cleanText = cleanText.replace(/\n{3,}/g, '\n\n');
+    // Text node
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent;
+    }
 
-  // === Try multiple copy methods ===
-  let copied = false;
+    const tag = node.tagName ? node.tagName.toLowerCase() : '';
 
-  // Method 1: Modern Clipboard API
-  navigator.clipboard.writeText(cleanText).then(() => {
-    console.log('%c[Success] Copied to clipboard!', 'color:#10b981; font-weight:bold');
-    copied = true;
+    // Headings
+    if (['h1','h2','h3','h4','h5','h6'].includes(tag)) {
+      const level = parseInt(tag[1]);
+      const content = Array.from(node.childNodes).map(toMarkdown).join('').trim();
+      return '#'.repeat(level) + ' ' + content + '\n\n';
+    }
+
+    // Bold
+    if (tag === 'strong' || tag === 'b') {
+      return '**' + Array.from(node.childNodes).map(toMarkdown).join('') + '**';
+    }
+
+    // Italic
+    if (tag === 'em' || tag === 'i') {
+      return '*' + Array.from(node.childNodes).map(toMarkdown).join('') + '*';
+    }
+
+    // Inline code
+    if (tag === 'code' && node.parentElement.tagName !== 'PRE') {
+      return '`' + node.textContent + '`';
+    }
+
+    // Code blocks
+    if (tag === 'pre' || (tag === 'code' && node.parentElement.tagName === 'PRE')) {
+      const code = node.textContent.trim();
+      return '\n```\n' + code + '\n```\n\n';
+    }
+
+    // Blockquote
+    if (tag === 'blockquote') {
+      const content = Array.from(node.childNodes).map(toMarkdown).join('').trim();
+      return content.split('\n').map(line => '> ' + line).join('\n') + '\n\n';
+    }
+
+    // Horizontal rule
+    if (tag === 'hr') {
+      return '\n---\n\n';
+    }
+
+    // Line break
+    if (tag === 'br') {
+      return '\n';
+    }
+
+    // Links / Citations
+    if (tag === 'a' && node.getAttribute('href')) {
+      const href = node.getAttribute('href');
+      let text = node.textContent.trim();
+      if (!text) text = new URL(href).hostname.replace('www.', '');
+      return `[${text}](${href})`;
+    }
+
+    // Lists
+    if (tag === 'li') {
+      const content = Array.from(node.childNodes).map(toMarkdown).join('').trim();
+      return '- ' + content + '\n';
+    }
+
+    if (tag === 'ul') {
+      return Array.from(node.children).map(toMarkdown).join('') + '\n';
+    }
+
+    if (tag === 'ol') {
+      return Array.from(node.children).map((li, i) => {
+        const content = Array.from(li.childNodes).map(toMarkdown).join('').trim();
+        return `${i + 1}. ${content}`;
+      }).join('\n') + '\n\n';
+    }
+
+    // Paragraphs and general containers
+    if (['p', 'div', 'section'].includes(tag)) {
+      const content = Array.from(node.childNodes).map(toMarkdown).join('');
+      return content.trim() ? content.trim() + '\n\n' : '';
+    }
+
+    // Default: process children recursively
+    return Array.from(node.childNodes).map(toMarkdown).join('');
+  }
+
+  // Convert everything
+  let markdown = toMarkdown(clone);
+
+  // Final cleanup
+  markdown = markdown
+    .replace(/\n{3,}/g, '\n\n')     // Max 2 blank lines
+    .replace(/[ \t]+\n/g, '\n')     // Trim trailing spaces
+    .trim();
+
+  // ========== Clipboard ==========
+  navigator.clipboard.writeText(markdown).then(() => {
+    console.log('%c[Success] Robust Markdown conversion copied!', 'color:#10b981; font-weight:bold');
   }).catch(() => {
-    // Method 2: Use console's built-in copy() helper (often works better)
     try {
-      copy(cleanText);
-      console.log('%c[Success] Copied using copy() helper!', 'color:#10b981; font-weight:bold');
-      copied = true;
-    } catch (e) {
-      // Method 3: Show text clearly so user can copy manually
-      console.log('%c[Clipboard blocked] Copy the text below manually:', 'color:#f59e0b; font-weight:bold');
-      console.log(cleanText);
+      copy(markdown);
+      console.log('%c[Success] Copied using fallback!', 'color:#10b981; font-weight:bold');
+    } catch {
+      console.log('%c[Clipboard blocked] Copy the text below:', 'color:#f59e0b; font-weight:bold');
+      console.log(markdown);
     }
   });
 }
