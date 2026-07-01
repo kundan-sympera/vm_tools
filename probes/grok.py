@@ -320,13 +320,21 @@ def _move_to_base_input() -> None:
 def _copy_response() -> str:
 	"""Click the Grok copy button and return clipboard contents."""
 	
-	pyperclip.copy("check")
-
 	pyautogui.press("f12")
 
 	time.sleep(COPY_WAIT)
 
-	pyautogui.typewrite(GROK_RESPONSE_JS)
+	pyperclip.copy(GROK_RESPONSE_JS)
+
+	pyautogui.keyDown("ctrl")
+	pyautogui.press("v")
+	pyautogui.keyUp("ctrl")
+
+	pyperclip.copy("check")
+	time.sleep(COPY_WAIT)
+
+	pyautogui.press("enter")
+
 
 	time.sleep(COPY_WAIT)
 
