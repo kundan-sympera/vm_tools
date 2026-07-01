@@ -19,7 +19,7 @@ from utils.llm import get_deepseek_response, parse_llm_response
 _FIELDS = ["website", "founded_year", "revenue", "ownership", "employees"]
 
 
-def _upsert_company(conn, pool_id: str, pool_id_link: str, extracted: dict, details: str):
+def _upsert_company(conn, pool_id: str, pool_id_link: str, validated_name: str, extracted: dict, details: str):
     with conn.cursor() as cur:
         cur.execute(
             "SELECT id FROM company_information WHERE pool_id_link = %s ORDER BY created_at DESC LIMIT 1",
@@ -29,30 +29,33 @@ def _upsert_company(conn, pool_id: str, pool_id_link: str, extracted: dict, deta
         if row:
             cur.execute("""
                 UPDATE company_information
-                SET pool_id=%(pool_id)s, name_check=%(name_check)s, website=%(website)s,
+                SET pool_id=%(pool_id)s, validated_name=COALESCE(NULLIF(%(validated_name)s, ''), validated_name),
+                    name_check=%(name_check)s, website=%(website)s,
                     founded_year=%(founded_year)s, revenue=%(revenue)s, ownership=%(ownership)s,
                     employees=%(employees)s, details=%(details)s, created_at=%(created_at)s
                 WHERE id=%(id)s
             """, {
-                "id":           row[0],
-                "pool_id":      str(pool_id),
-                "name_check":   extracted.get("name_check", False),
-                "website":      extracted.get("website", ""),
-                "founded_year": extracted.get("founded_year", ""),
-                "revenue":      extracted.get("revenue", ""),
-                "ownership":    extracted.get("ownership", ""),
-                "employees":    extracted.get("employees", ""),
-                "details":      details,
-                "created_at":   datetime.now(),
+                "id":             row[0],
+                "pool_id":        str(pool_id),
+                "validated_name": validated_name,
+                "name_check":     extracted.get("name_check", False),
+                "website":        extracted.get("website", ""),
+                "founded_year":   extracted.get("founded_year", ""),
+                "revenue":        extracted.get("revenue", ""),
+                "ownership":      extracted.get("ownership", ""),
+                "employees":      extracted.get("employees", ""),
+                "details":        details,
+                "created_at":     datetime.now(),
             })
         else:
             cur.execute("""
                 INSERT INTO company_information
-                    (pool_id, pool_id_link, name_check, website, founded_year, revenue, ownership, employees, details, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (pool_id, pool_id_link, validated_name, name_check, website, founded_year, revenue, ownership, employees, details, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 str(pool_id),
                 str(pool_id_link),
+                validated_name,
                 extracted.get("name_check", False),
                 extracted.get("website", ""),
                 extracted.get("founded_year", ""),
@@ -101,7 +104,7 @@ def run(csv_bytes: bytes) -> bytes:
             extracted   = parse_llm_response(raw)
             if not isinstance(extracted, dict):
                 extracted = {}
-            _upsert_company(conn, pool_id, pool_id_link, extracted, details)
+            _upsert_company(conn, pool_id, pool_id_link, name, extracted, details)
 
         if extracted.get("name_check") is True:
             for field in _FIELDS:

@@ -1,0 +1,568 @@
+<style>
+  /* ── Grok Data: break out of .main max-width ── */
+  #page-grok-data.active {
+    position: fixed;
+    left: var(--sidebar-w);
+    right: 0; top: 0; bottom: 0;
+    display: flex !important;
+    flex-direction: column;
+    background: var(--bg);
+    z-index: 5;
+  }
+
+  .gd-header {
+    padding: 18px 32px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .gd-header h2 { margin: 0; }
+
+  .gd-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── List panel ── */
+  .gd-list {
+    width: 300px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .gd-search-wrap {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .gd-search-wrap input {
+    width: 100%;
+    margin: 0;
+    font-size: 13px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .gd-search-wrap input:focus { border-color: var(--accent); }
+
+  .gd-list-count {
+    padding: 5px 13px;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .gd-items { flex: 1; overflow-y: auto; }
+
+  .gd-item {
+    padding: 9px 13px;
+    border-bottom: 1px solid rgba(42,51,71,.4);
+    cursor: pointer;
+    transition: background .12s;
+    border-left: 3px solid transparent;
+  }
+  .gd-item:hover  { background: rgba(255,255,255,.03); }
+  .gd-item.active { background: rgba(79,142,247,.08); border-left-color: var(--accent); }
+
+  .gd-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gd-item-id {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .gd-item-sub {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gd-list-msg {
+    padding: 28px 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ── Detail panel ── */
+  .gd-detail {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 36px;
+  }
+
+  .gd-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--muted);
+    font-size: 14px;
+    gap: 10px;
+  }
+  .gd-placeholder-icon { font-size: 40px; opacity: .25; }
+
+  .gd-detail-header { margin-bottom: 18px; }
+  .gd-detail-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 5px;
+  }
+  .gd-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .gd-detail-meta span.gd-mono { font-family: var(--mono); }
+  .gd-detail-link {
+    color: var(--accent);
+    text-decoration: none;
+    word-break: break-all;
+  }
+  .gd-detail-link:hover { text-decoration: underline; }
+
+  /* ── Action buttons ── */
+  .gd-actions {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0 20px;
+  }
+  .gd-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .gd-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .gd-action-btn.copied { border-color: var(--accent2) !important; color: var(--accent2) !important; }
+
+  .gd-section-lbl {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    margin: 0 0 9px;
+  }
+
+  /* ── Markdown ── */
+  .gd-markdown {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: var(--text);
+  }
+  .gd-markdown h1 { font-size: 18px; font-weight: 700; margin: 0 0 12px; }
+  .gd-markdown h2 { font-size: 15px; font-weight: 600; margin: 18px 0 9px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .gd-markdown h3 { font-size: 13.5px; font-weight: 600; margin: 14px 0 7px; color: var(--accent3); }
+  .gd-markdown h4, .gd-markdown h5, .gd-markdown h6 { font-size: 13px; font-weight: 600; margin: 10px 0 5px; }
+  .gd-markdown p { margin: 0 0 9px; }
+  .gd-markdown p:last-child { margin-bottom: 0; }
+  .gd-markdown ul, .gd-markdown ol { margin: 0 0 9px 18px; }
+  .gd-markdown li { margin-bottom: 3px; }
+  .gd-markdown strong { font-weight: 700; }
+  .gd-markdown em { font-style: italic; color: var(--accent3); }
+  .gd-markdown code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: rgba(255,255,255,.07);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent3);
+  }
+  .gd-markdown pre {
+    background: rgba(0,0,0,.3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 13px 16px;
+    overflow-x: auto;
+    margin: 0 0 10px;
+  }
+  .gd-markdown pre code { background: none; padding: 0; color: var(--text); border-radius: 0; font-size: 12px; }
+  .gd-markdown hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .gd-markdown a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: rgba(79,142,247,.35);
+    text-underline-offset: 2px;
+    transition: text-decoration-color .15s;
+    word-break: break-all;
+  }
+  .gd-markdown a:hover { text-decoration-color: var(--accent); }
+  .gd-markdown a[target="_blank"]::after {
+    content: ' ↗';
+    font-size: .75em;
+    opacity: .55;
+    font-style: normal;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .gd-markdown blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 13px;
+    margin: 0 0 9px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .gd-markdown table { width: 100%; border-collapse: collapse; margin: 0 0 10px; font-size: 13px; }
+  .gd-markdown th, .gd-markdown td { border: 1px solid var(--border); padding: 6px 11px; text-align: left; }
+  .gd-markdown th { background: rgba(255,255,255,.04); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+  .gd-no-details { color: var(--muted); font-style: italic; font-size: 13px; }
+
+  /* ── Spinner ── */
+  .gd-spinner { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--muted); font-size: 13px; gap: 9px; }
+  .gd-spin { width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: gdspin .7s linear infinite; flex-shrink: 0; }
+  @keyframes gdspin { to { transform: rotate(360deg); } }
+</style>
+
+<section class="page" id="page-grok-data">
+  <div class="gd-header">
+    <h2>Grok Data</h2>
+    <span style="color:var(--muted);font-size:13px">company_information</span>
+  </div>
+  <div class="gd-body">
+
+    <!-- Left: list -->
+    <div class="gd-list">
+      <div class="gd-search-wrap">
+        <input type="text" id="gd-search" placeholder="Search by ID or company name…" autocomplete="off" />
+      </div>
+      <div class="gd-list-count" id="gd-count">—</div>
+      <div class="gd-items" id="gd-items">
+        <div class="gd-list-msg">Click the tab to load Grok results.</div>
+      </div>
+    </div>
+
+    <!-- Right: detail -->
+    <div class="gd-detail" id="gd-detail">
+      <div class="gd-placeholder">
+        <div class="gd-placeholder-icon">🤖</div>
+        <div>Select a company from the list</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<script>
+(function () {
+  let gdLoaded = false;
+  let gdSearchTimer = null;
+  let gdActiveId = null;
+  let gdCurrent = null; // currently selected row, for copy/download actions
+
+  // ── HTML escape ──────────────────────────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function tryHostname(url) {
+    try { return new URL(url).hostname; } catch { return url || ''; }
+  }
+
+  // ── Markdown → HTML ──────────────────────────────────────────
+  function mdToHtml(text) {
+    if (!text || !text.trim()) return '<p class="gd-no-details">No details available.</p>';
+
+    function inline(s) {
+      const slots = [];
+      function protect(html) {
+        const idx = slots.length;
+        slots.push(html);
+        return '\x01' + idx + '\x01';
+      }
+
+      s = s.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_, text, url) =>
+        protect(`<a href="${esc(url)}" target="_blank">${esc(text)}</a>`)
+      );
+
+      s = s.replace(/(https?:\/\/[^\s<>"]+)/g, url =>
+        protect(`<a href="${esc(url)}" target="_blank">${esc(url)}</a>`)
+      );
+
+      s = esc(s);
+
+      s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+      s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+      s = s.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      slots.forEach((html, idx) => { s = s.split('\x01' + idx + '\x01').join(html); });
+      return s;
+    }
+
+    const lines = text.split('\n');
+    const out = [];
+    let listItems = [];
+    let listType = 'ul';
+    let i = 0;
+
+    function flushList() {
+      if (!listItems.length) return;
+      out.push(`<${listType}>${listItems.map(li => `<li>${li}</li>`).join('')}</${listType}>`);
+      listItems = [];
+    }
+
+    while (i < lines.length) {
+      const raw = lines[i];
+      const line = raw.trim();
+
+      if (line.startsWith('```')) {
+        flushList();
+        const codeLines = [];
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith('```')) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        out.push(`<pre><code>${esc(codeLines.join('\n'))}</code></pre>`);
+        i++; continue;
+      }
+
+      if (/^[-*_]{3,}$/.test(line)) {
+        flushList(); out.push('<hr>'); i++; continue;
+      }
+
+      const hm = line.match(/^(#{1,6})\s+(.*)/);
+      if (hm) {
+        flushList();
+        const level = Math.min(hm[1].length, 6);
+        out.push(`<h${level}>${inline(hm[2])}</h${level}>`);
+        i++; continue;
+      }
+
+      if (line.startsWith('>')) {
+        flushList();
+        out.push(`<blockquote>${inline(line.slice(1).trim())}</blockquote>`);
+        i++; continue;
+      }
+
+      const ulm = line.match(/^[-*+]\s+(.*)/);
+      if (ulm) {
+        if (listType !== 'ul' && listItems.length) flushList();
+        listType = 'ul';
+        listItems.push(inline(ulm[1]));
+        i++; continue;
+      }
+
+      const olm = line.match(/^\d+\.\s+(.*)/);
+      if (olm) {
+        if (listType !== 'ol' && listItems.length) flushList();
+        listType = 'ol';
+        listItems.push(inline(olm[1]));
+        i++; continue;
+      }
+
+      if (!line) { flushList(); i++; continue; }
+
+      flushList();
+      out.push(`<p>${inline(raw)}</p>`);
+      i++;
+    }
+
+    flushList();
+    return out.join('\n') || '<p class="gd-no-details">Empty details.</p>';
+  }
+
+  // ── Load list ─────────────────────────────────────────────────
+  async function loadGrokData(search = '') {
+    const itemsEl = document.getElementById('gd-items');
+    const countEl = document.getElementById('gd-count');
+    itemsEl.innerHTML = '<div class="gd-spinner"><div class="gd-spin"></div>Loading…</div>';
+
+    try {
+      const q = search.trim() ? '?search=' + encodeURIComponent(search.trim()) : '';
+      const res = await fetch('/probe/grok/data' + q);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.statusText); }
+      const data = await res.json();
+
+      const label = search.trim() ? ' (filtered)' : '';
+      countEl.textContent = data.length + (data.length === 1 ? ' company' : ' companies') + label;
+
+      if (!data.length) {
+        itemsEl.innerHTML = '<div class="gd-list-msg">No results found.</div>';
+        return;
+      }
+
+      itemsEl.innerHTML = '';
+      data.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'gd-item' + (item.id === gdActiveId ? ' active' : '');
+        el.dataset.id = item.id;
+
+        const name = esc(item.validated_name || '(unnamed company)');
+        const id   = esc(item.pool_id || '—');
+        const sub  = esc(tryHostname(item.pool_id_link) || item.pool_id_link || '—');
+
+        el.innerHTML =
+          `<div class="gd-item-name">${name}</div>` +
+          `<div class="gd-item-id">ID: ${id}</div>` +
+          `<div class="gd-item-sub">${sub}</div>`;
+
+        el.addEventListener('click', () => selectGrokRow(item.id, el));
+        itemsEl.appendChild(el);
+      });
+    } catch (err) {
+      itemsEl.innerHTML = `<div class="gd-list-msg" style="color:var(--danger)">${esc(err.message)}</div>`;
+      countEl.textContent = 'Error';
+    }
+  }
+
+  // ── Select row ────────────────────────────────────────────────
+  async function selectGrokRow(id, listEl) {
+    document.querySelectorAll('#gd-items .gd-item').forEach(el => el.classList.remove('active'));
+    if (listEl) listEl.classList.add('active');
+    gdActiveId = id;
+
+    const detail = document.getElementById('gd-detail');
+    detail.innerHTML = '<div class="gd-spinner"><div class="gd-spin"></div>Loading…</div>';
+
+    try {
+      const res = await fetch('/probe/grok/data/' + id);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.statusText); }
+      const row = await res.json();
+      gdCurrent = row;
+      renderDetail(row);
+    } catch (err) {
+      detail.innerHTML = `<div style="color:var(--danger);padding:20px">${esc(err.message)}</div>`;
+    }
+  }
+
+  // ── Render detail ─────────────────────────────────────────────
+  function renderDetail(row) {
+    const detail = document.getElementById('gd-detail');
+    const date = row.created_at ? new Date(row.created_at).toLocaleString() : '—';
+    const linkHtml = row.pool_id_link
+      ? `<a href="${esc(row.pool_id_link)}" target="_blank" class="gd-detail-link">${esc(row.pool_id_link)}</a>`
+      : '—';
+
+    detail.innerHTML = `
+      <div class="gd-detail-header">
+        <h3>${esc(row.validated_name || '(unnamed company)')}</h3>
+        <div class="gd-detail-meta">
+          <span>ID: <span class="gd-mono">${esc(row.pool_id || '—')}</span></span>
+          <span>Pool link: ${linkHtml}</span>
+          <span>Saved: ${esc(date)}</span>
+        </div>
+      </div>
+
+      <div class="gd-actions">
+        <button class="gd-action-btn" id="gd-btn-download">⬇ Download markdown</button>
+        <button class="gd-action-btn" id="gd-btn-copy-raw">Copy raw</button>
+        <button class="gd-action-btn" id="gd-btn-copy-formatted">Copy formatted</button>
+      </div>
+
+      <div class="gd-section-lbl">Details</div>
+      <div class="gd-markdown">${mdToHtml(row.details)}</div>
+    `;
+
+    document.getElementById('gd-btn-download').addEventListener('click', downloadMarkdown);
+    document.getElementById('gd-btn-copy-raw').addEventListener('click', (e) => copyRaw(e.currentTarget));
+    document.getElementById('gd-btn-copy-formatted').addEventListener('click', (e) => copyFormatted(e.currentTarget));
+  }
+
+  function safeFileStem() {
+    const stem = (gdCurrent.validated_name || gdCurrent.pool_id || 'grok_details').toString();
+    return stem.replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'grok_details';
+  }
+
+  function flashCopied(btn, label) {
+    const prev = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1500);
+  }
+
+  // ── Download raw markdown as a .md file ─────────────────────
+  function downloadMarkdown() {
+    if (!gdCurrent) return;
+    const blob = new Blob([gdCurrent.details || ''], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${safeFileStem()}.md`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Copy raw markdown text ───────────────────────────────────
+  async function copyRaw(btn) {
+    try {
+      await navigator.clipboard.writeText(gdCurrent.details || '');
+      flashCopied(btn);
+    } catch {
+      btn.textContent = 'Error';
+      setTimeout(() => { btn.textContent = 'Copy raw'; }, 1500);
+    }
+  }
+
+  // ── Copy rendered (rich-text) version, with plain-text fallback ──
+  async function copyFormatted(btn) {
+    const html = mdToHtml(gdCurrent.details || '');
+    try {
+      if (window.ClipboardItem) {
+        const item = new ClipboardItem({
+          'text/html':  new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([gdCurrent.details || ''], { type: 'text/plain' }),
+        });
+        await navigator.clipboard.write([item]);
+      } else {
+        await navigator.clipboard.writeText(gdCurrent.details || '');
+      }
+      flashCopied(btn);
+    } catch {
+      btn.textContent = 'Error';
+      setTimeout(() => { btn.textContent = 'Copy formatted'; }, 1500);
+    }
+  }
+
+  // ── Search debounce ──────────────────────────────────────────
+  document.getElementById('gd-search').addEventListener('input', function () {
+    clearTimeout(gdSearchTimer);
+    gdSearchTimer = setTimeout(() => loadGrokData(this.value), 300);
+  });
+
+  // ── Auto-load when tab becomes active ───────────────────────
+  const section = document.getElementById('page-grok-data');
+  new MutationObserver(mutations => {
+    for (const m of mutations) {
+      if (m.attributeName === 'class' && section.classList.contains('active') && !gdLoaded) {
+        gdLoaded = true;
+        loadGrokData();
+      }
+    }
+  }).observe(section, { attributes: true });
+})();
+</script>

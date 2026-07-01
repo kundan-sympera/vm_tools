@@ -18,7 +18,7 @@ import pyautogui
 import pyperclip
 
 import screen_positions  # must expose GROK_COPY_1080p (with .x / .y)
-from utils.db import get_conn, get_details, save_details
+from utils.db import get_conn, ensure_company_table, get_details, save_details
 
 # ─────────────────────────────────────────────
 #  Constants
@@ -423,6 +423,7 @@ def scrape(
 	conn = None
 	try:
 		conn = get_conn()
+		ensure_company_table(conn)
 	except Exception as exc:
 		print(f"[grok] DB unavailable, cache disabled: {exc}")
 
@@ -480,7 +481,7 @@ def scrape(
 
 			if conn and pool_id_link and status != "error":
 				try:
-					save_details(conn, pool_id, pool_id_link, details)
+					save_details(conn, pool_id, pool_id_link, details, validated_name=validated_name)
 				except Exception as exc:
 					print(f"[grok] DB save failed for {pool_id_link}: {exc}")
 

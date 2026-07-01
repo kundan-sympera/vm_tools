@@ -6,7 +6,7 @@ Routes:
   routers/zoominfo.py  → POST /probe/zoominfo
   routers/stocks.py    → POST /probe/stocks
   routers/zocdoc.py    → POST /probe/zocdoc, POST /probe/zocdoc-profiles
-  routers/grok.py      → POST /probe/grok
+  routers/grok.py      → POST /probe/grok, GET /probe/grok/data, GET /probe/grok/data/{id}
   routers/company.py   → POST /service/company-extract
   routers/explore.py   → GET  /explore/companies
   routers/cache.py     → GET/DELETE /cache

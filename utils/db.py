@@ -6,7 +6,7 @@ Public API
 get_conn()
 ensure_company_table(conn)
 get_details(conn, pool_id_link)         -> str | None
-save_details(conn, pool_id, pool_id_link, details)
+save_details(conn, pool_id, pool_id_link, details, validated_name=None)
 get_extracted_company(conn, pool_id_link) -> dict | None
 
 # Per-scraper caches (each owns its own table)
@@ -40,17 +40,18 @@ ALL_CACHE_TABLES = [CACHE_GENERAL, CACHE_ZOCDOC, CACHE_ZOCDOC_PROFILE, CACHE_ZOO
 
 _CREATE_COMPANY_TABLE = """
     CREATE TABLE IF NOT EXISTS company_information (
-        id           SERIAL PRIMARY KEY,
-        pool_id      TEXT,
-        pool_id_link TEXT NOT NULL,
-        name_check   BOOLEAN,
-        website      TEXT,
-        founded_year TEXT,
-        revenue      TEXT,
-        ownership    TEXT,
-        employees    TEXT,
-        details      TEXT,
-        created_at   TIMESTAMP DEFAULT NOW()
+        id             SERIAL PRIMARY KEY,
+        pool_id        TEXT,
+        pool_id_link   TEXT NOT NULL,
+        validated_name TEXT,
+        name_check     BOOLEAN,
+        website        TEXT,
+        founded_year   TEXT,
+        revenue        TEXT,
+        ownership      TEXT,
+        employees      TEXT,
+        details        TEXT,
+        created_at     TIMESTAMP DEFAULT NOW()
     )
 """
 
@@ -86,7 +87,7 @@ def get_details(conn, pool_id_link: str) -> str | None:
     return details if len(details) >= _MIN_DETAIL_LEN else None
 
 
-def save_details(conn, pool_id: str, pool_id_link: str, details: str) -> None:
+def save_details(conn, pool_id: str, pool_id_link: str, details: str, validated_name: str | None = None) -> None:
     """Update existing row for pool_id_link, or insert if absent."""
     with conn.cursor() as cur:
         cur.execute(
@@ -96,13 +97,13 @@ def save_details(conn, pool_id: str, pool_id_link: str, details: str) -> None:
         row = cur.fetchone()
         if row:
             cur.execute(
-                "UPDATE company_information SET details = %s, created_at = NOW() WHERE id = %s",
-                (details, row[0]),
+                "UPDATE company_information SET details = %s, validated_name = COALESCE(NULLIF(%s, ''), validated_name), created_at = NOW() WHERE id = %s",
+                (details, validated_name or "", row[0]),
             )
         else:
             cur.execute(
-                "INSERT INTO company_information (pool_id, pool_id_link, details) VALUES (%s, %s, %s)",
-                (str(pool_id), str(pool_id_link), details),
+                "INSERT INTO company_information (pool_id, pool_id_link, validated_name, details) VALUES (%s, %s, %s, %s)",
+                (str(pool_id), str(pool_id_link), validated_name or "", details),
             )
     conn.commit()
 
