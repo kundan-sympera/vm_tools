@@ -267,6 +267,7 @@ COMPANY_QUERY_WAIT = 45
 
 # Seconds to wait after clicking the copy button
 COPY_WAIT = 2
+TYPE_WAIT = 1
 
 # Seconds to wait after click
 CLICK_WAIT = 0.5
@@ -322,7 +323,7 @@ def _copy_response() -> str:
 	
 	pyautogui.press("f12")
 
-	time.sleep(COPY_WAIT)
+	time.sleep(TYPE_WAIT)
 
 	pyperclip.copy(GROK_RESPONSE_JS)
 
@@ -331,16 +332,14 @@ def _copy_response() -> str:
 	pyautogui.keyUp("ctrl")
 
 	pyperclip.copy("check")
-	time.sleep(COPY_WAIT)
+	time.sleep(TYPE_WAIT)
 
 	pyautogui.press("enter")
 
+	time.sleep(TYPE_WAIT)
+	pyautogui.press("f12")
 
-	time.sleep(COPY_WAIT)
-
-	pyautogui.press("enter")
-
-	time.sleep(COPY_WAIT)
+	time.sleep(CLICK_WAIT)
 
 
 	if pyperclip.paste() == "check":
