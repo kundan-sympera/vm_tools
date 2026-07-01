@@ -321,14 +321,27 @@ def _copy_response() -> str:
 	"""Click the Grok copy button and return clipboard contents."""
 	
 	pyperclip.copy("check")
-	
-	pyautogui.moveTo(
-		screen_positions.GROK_COPY_3R_1080p.x,
-		screen_positions.GROK_COPY_3R_1080p.y,
-	)
-	
-	pyautogui.click()
+
+	pyautogui.press("f12")
+
 	time.sleep(COPY_WAIT)
+
+	pyautogui.typewrite(GROK_RESPONSE_JS)
+
+	time.sleep(COPY_WAIT)
+
+	pyautogui.press("enter")
+
+	time.sleep(COPY_WAIT)
+
+
+	if pyperclip.paste() == "check":
+		pyautogui.moveTo(
+			screen_positions.GROK_COPY_3R_1080p.x,
+			screen_positions.GROK_COPY_3R_1080p.y,
+		)
+		pyautogui.click()
+		time.sleep(COPY_WAIT)
 	
 	if pyperclip.paste() == "check":
 	
