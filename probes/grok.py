@@ -109,11 +109,7 @@ Please help me to answer the following questions for the company provided as inp
 The company’s main location, if you are not sure answer NA.
 Is the company’s physical headquarters/office address located within the following counties? (Ignore service areas/areas served): Yes / No"
 Priority Locations: Nassau/Queens  NY , Nassau/Suffolk County Long Island, Westchester County, Bergen County, NJ
-Public Official Links: (for this first verify that the links work and is active)
-•	Website:
-•	LinkedIn:
-•	Other relevant links:
-
+Public Official Links: (for this first verify that the links work and is active) share this information as a table for all the links that were found public profile, website, linkedin, facebook
 Founded Year:
 Employee count: (tightened range which is as accurate as possible for the company)
 does the company have alternative names, DBA , previous names? [We need this for the UCC]
@@ -187,7 +183,7 @@ For example :  The firm is an active donor to local academic funds and a long-st
  For every growth signal, award, or rating mentioned, provide a direct URL link to the source (e.g., the Angi profile, the SuperLawyers listing, or the official press release).
  Verification Rule: Do not include a signal if you cannot provide a functioning link to verify it. If a link is not available, list the signal as "Unverified" or omit it.
 
-Always format links in Markdown as [descriptive link text](full URL) for clickable hyperlinks. Do not use inline citations like [web:xx] or plain URLs without text.
+Always try to provide citations for statements.
 """
 
 # Seconds to wait after opening Grok before typing
